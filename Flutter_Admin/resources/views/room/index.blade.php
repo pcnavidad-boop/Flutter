@@ -205,8 +205,11 @@
 
             <div class="modal-footer">
                 <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-success">dsadaddsadsadasdwadsawdsUpdate</button>
+                <button type="submit" class="btn btn-success">Update</button>
             </div>
+
+
+
         </form>
     </div>
 </div>
