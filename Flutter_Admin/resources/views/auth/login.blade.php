@@ -1,4 +1,6 @@
-<x-guest-layout>
+@extends('layouts.guest')
+
+@section('content')
     <div class="text-center mb-4">
         <h2 class="fw-bold">Login</h2>
         <p class="text-muted">Please sign in to continue</p>
@@ -61,4 +63,4 @@
             </button>
         </div>
     </form>
-</x-guest-layout>
+@endsection
