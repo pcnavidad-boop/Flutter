@@ -14,24 +14,29 @@ return new class extends Migration
         Schema::create('room_bookings', function (Blueprint $table) {
             $table->id();
 
-            //guest data
+            // Guest Information
             $table->string('guest_name');
             $table->string('guest_email');
             $table->string('guest_contact')->nullable();
 
-            //foregin keys
+            // Foreign Keys
             $table->foreignId('room_id')->constrained('rooms')->onDelete('cascade');
             $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('set null');
 
-            //booking attributes
-            $table->date('check_in_date');
-            $table->date('check_out_date');
+            // Booking Details
+            // Normal Rooms
+            $table->date('check_in_date')->nullable();   
+            $table->date('check_out_date')->nullable();  
+
+            // Function Rooms
+            $table->date('event_date')->nullable();
+            $table->time('start_time')->nullable();
+            $table->time('end_time')->nullable();
 
             $table->date('booking_date');
-            $table->enum('status', ['pending','confirmed','declined','checked_in','checked_out','cancelled']);
+            $table->enum('status', ['Pending','Confirmed','Declined','Checked_In','Checked_Out','Cancelled'])->default('Pending');
             $table->text('status_change_reason')->nullable();
 
-            
             $table->timestamps();
         });
     }
