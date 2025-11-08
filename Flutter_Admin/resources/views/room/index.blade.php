@@ -18,7 +18,7 @@
 
     <div class="card">
         <div class="card-body">
-            <!-- Add id for DataTables -->
+            
             <table id="rooms-table" class="table table-striped align-middle display nowrap" style="width:100%">
                 <thead class="table-dark">
                     <tr>
