@@ -5,21 +5,20 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
-class Room extends Model
+class Service extends Model
 {
-    
     use HasFactory;
 
     protected $fillable = [
-        'room_number',
-        'room_type',
+        'service_name',
+        'service_description',
+        'service_capacity',
+        'service_image',
         'price_type',
         'base_price',
-        'number_of_beds',
-        'room_capacity',
-        'room_availability_status',
-        'room_description',
-        'room_image',
+        'service_start_time',
+        'service_end_time',
+        'service_availability_status',
         'is_archived',
     ];
 
