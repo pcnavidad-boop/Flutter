@@ -40,7 +40,7 @@
             </div>
 
             {{-- Blade slot for login/register forms --}}
-            {{ $slot }}
+            @yield('content')
         </div>
     </div>
 
