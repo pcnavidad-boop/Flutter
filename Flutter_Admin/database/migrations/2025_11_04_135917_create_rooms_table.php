@@ -16,7 +16,7 @@ return new class extends Migration
 
             // Room Identification
             $table->string('room_number')->unique();
-            $table->enum('room_type', ['Single','Double','Quad','Family','Suite','Penthouse','Function'])->default('Single');
+            $table->enum('type', ['Single','Double','Quad','Family','Suite','Penthouse','Function'])->default('Single');
 
             // Pricing
             $table->enum('price_type', ['per_night','per_hour','per_event'])->default('per_night');
@@ -25,17 +25,20 @@ return new class extends Migration
 
             // Capacity
             $table->integer('number_of_beds')->nullable();
-            $table->integer('room_capacity')->default(1);
+            $table->integer('capacity')->default(1);
 
             // Availability
-            $table->enum('room_availability_status', ['Available','Occupied','Maintenance','Unavailable'])->default('Available');
+            $table->enum('status', ['Available','Occupied','Maintenance','Unavailable'])->default('Available');
 
             // Descriptive Info
-            $table->string('room_description')->nullable();
-            $table->string('room_image')->nullable();
+            $table->text('description')->nullable();
+            $table->string('image')->nullable();
 
             // Archive Status
             $table->boolean('is_archived')->default(false);
+
+            // Foreign Key
+            $table->foreignId('user_id')->constrained('users')->onDelete('set null');
 
             $table->timestamps();
         });

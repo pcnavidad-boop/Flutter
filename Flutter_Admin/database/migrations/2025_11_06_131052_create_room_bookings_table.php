@@ -24,6 +24,9 @@ return new class extends Migration
             $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('set null');
 
             // Booking Details
+            $table->decimal('total_price', 10, 2)->nullable();
+            $table->text('remarks')->nullable();
+
             // Normal Rooms
             $table->date('check_in_date')->nullable();   
             $table->date('check_out_date')->nullable();  
@@ -32,9 +35,12 @@ return new class extends Migration
             $table->date('event_date')->nullable();
             $table->time('start_time')->nullable();
             $table->time('end_time')->nullable();
-
+            
+            // Booking Life Cycle
+            $table->enum('type', ['Online','Walk-in','Phone','E-mail'])->default('Online');
             $table->date('booking_date');
-            $table->enum('status', ['Pending','Confirmed','Declined','Checked_In','Checked_Out','Cancelled'])->default('Pending');
+            $table->enum('booking_status', ['Pending','Confirmed','Declined','Checked_In','Checked_Out','Cancelled'])->default('Pending');
+            $table->enum('payment_status', ['Unpaid','Partially_Paid','Paid','Refunded'])->default('Unpaid');
             $table->text('status_change_reason')->nullable();
 
             $table->timestamps();
