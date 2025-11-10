@@ -20,9 +20,9 @@ return new class extends Migration
 
             // Payment Details
             $table->decimal('amount', 10, 2);
-            $table->date('payment_date');
-            $table->enum('payment_method', ['Cash', 'Card', 'Bank Transfer', 'E-Wallet'])->default('Cash');
-            $table->enum('payment_status', ['Pending', 'Completed', 'Failed', 'Refunded'])->default('Pending');
+            $table->date('date');
+            $table->enum('method', ['Cash', 'Card', 'Bank Transfer', 'E-Wallet'])->default('Cash');
+            $table->enum('status', ['Pending', 'Completed', 'Failed', 'Refunded'])->default('Pending');
 
             $table->timestamps();
         });
