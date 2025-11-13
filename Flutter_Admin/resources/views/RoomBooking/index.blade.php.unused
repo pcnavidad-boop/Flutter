@@ -1,0 +1,170 @@
+@extends('layouts.rooms')
+
+@section('content')
+
+<!-- DataTables CSS (CDN) -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.dataTables.min.css">
+
+<x-alert_message></x-alert_message>
+
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Room Bookings</h3>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createBookingModal">
+            + Add Booking
+        </button>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <table id="bookings-table" class="table table-striped align-middle display nowrap" style="width:100%">
+                <thead class="table-dark">
+                    <tr>
+                        <th>#</th>
+                        <th>Guest Name</th>
+                        <th>Email</th>
+                        <th>Contact</th>
+                        <th>Room</th>
+                        <th>Check-In</th>
+                        <th>Check-Out</th>
+                        <th>Event Date</th>
+                        <th>Booking Date</th>
+                        <th>Status</th>
+                        <th>Processed By</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($room_bookings as $booking)
+                    <tr>
+                        <td>{{ $booking->id }}</td>
+                        <td>{{ $booking->guest_name }}</td>
+                        <td>{{ $booking->guest_email }}</td>
+                        <td>{{ $booking->guest_contact ?? 'N/A' }}</td>
+                        <td>{{ $booking->room->room_number ?? 'N/A' }}</td>
+                        <td>{{ $booking->check_in_date ?? '-' }}</td>
+                        <td>{{ $booking->check_out_date ?? '-' }}</td>
+                        <td>{{ $booking->event_date ?? '-' }}</td>
+                        <td>{{ $booking->booking_date }}</td>
+                        <td>
+                            @switch($booking->status)
+                                @case('Pending')
+                                    <span class="badge bg-warning text-dark">{{ $booking->status }}</span>
+                                    @break
+                                @case('Confirmed')
+                                    <span class="badge bg-success">{{ $booking->status }}</span>
+                                    @break
+                                @case('Declined')
+                                    <span class="badge bg-danger">{{ $booking->status }}</span>
+                                    @break
+                                @case('Checked_In')
+                                    <span class="badge bg-primary">{{ $booking->status }}</span>
+                                    @break
+                                @case('Checked_Out')
+                                    <span class="badge bg-secondary">{{ $booking->status }}</span>
+                                    @break
+                                @case('Cancelled')
+                                    <span class="badge bg-dark">{{ $booking->status }}</span>
+                                    @break
+                                @default
+                                    <span class="badge bg-light text-dark">{{ $booking->status }}</span>
+                            @endswitch
+                        </td>
+                        <td>{{ $booking->processedBy->name ?? 'N/A' }}</td>
+                        <td>
+                            <button 
+                                class="btn btn-sm btn-outline-secondary editBookingBtn"
+                                data-bs-toggle="modal"
+                                data-bs-target="#editBookingModal"
+                                data-id="{{ $booking->id }}"
+                                data-guest_name="{{ $booking->guest_name }}"
+                                data-guest_email="{{ $booking->guest_email }}"
+                                data-guest_contact="{{ $booking->guest_contact }}"
+                                data-room_id="{{ $booking->room_id }}"
+                                data-check_in_date="{{ $booking->check_in_date }}"
+                                data-check_out_date="{{ $booking->check_out_date }}"
+                                data-event_date="{{ $booking->event_date }}"
+                                data-start_time="{{ $booking->start_time }}"
+                                data-end_time="{{ $booking->end_time }}"
+                                data-booking_date="{{ $booking->booking_date }}"
+                                data-status="{{ $booking->status }}"
+                                data-status_reason="{{ $booking->status_change_reason }}">
+                                Edit
+                            </button>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="12" class="text-center text-muted">No bookings found.</td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- create booking modal -->
+<x-modal.create_booking />
+
+<!-- edit booking modal -->
+<x-modal.edit_booking />
+
+{{-- JS to populate edit modal --}}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const editButtons = document.querySelectorAll('.editBookingBtn');
+    const editForm = document.getElementById('editBookingForm');
+
+    editButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const id = button.dataset.id;
+            editForm.action = `/room-bookings/${id}`;
+
+            document.getElementById('edit_guest_name').value = button.dataset.guest_name ?? '';
+            document.getElementById('edit_guest_email').value = button.dataset.guest_email ?? '';
+            document.getElementById('edit_guest_contact').value = button.dataset.guest_contact ?? '';
+            document.getElementById('edit_room_id').value = button.dataset.room_id ?? '';
+            document.getElementById('edit_check_in_date').value = button.dataset.check_in_date ?? '';
+            document.getElementById('edit_check_out_date').value = button.dataset.check_out_date ?? '';
+            document.getElementById('edit_event_date').value = button.dataset.event_date ?? '';
+            document.getElementById('edit_start_time').value = button.dataset.start_time ?? '';
+            document.getElementById('edit_end_time').value = button.dataset.end_time ?? '';
+            document.getElementById('edit_booking_date').value = button.dataset.booking_date ?? '';
+            document.getElementById('edit_status').value = button.dataset.status ?? 'Pending';
+            document.getElementById('edit_status_change_reason').value = button.dataset.status_reason ?? '';
+        });
+    });
+
+    const editModalEl = document.getElementById('editBookingModal');
+    editModalEl.addEventListener('hidden.bs.modal', function () {
+        editForm.reset();
+        document.getElementById('editBookingAlerts').innerHTML = '';
+    });
+});
+</script>
+
+<!-- jQuery + DataTables JS (CDN) -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+
+<!-- DataTables initialization -->
+<script>
+$(document).ready(function() {
+    $('#bookings-table').DataTable({
+        responsive: true,
+        paging: true,
+        searching: true,
+        ordering: true,
+        pageLength: 10,
+        lengthMenu: [ [10, 25, 50], [10, 25, 50] ],
+        columnDefs: [
+            { orderable: false, targets: -1 }
+        ]
+    });
+});
+</script>
+
+@endsection
