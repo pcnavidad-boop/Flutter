@@ -12,11 +12,11 @@ class Payment extends Model
     protected $fillable = [
         'room_booking_id',
         'service_booking_id',
+        'admin_id',
         'amount',
         'date',
         'method',
         'status',
-        'admin_id',
     ];
 
     protected function casts(): array
