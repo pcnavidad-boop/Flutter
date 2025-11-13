@@ -15,24 +15,29 @@ return new class extends Migration
             $table->id();
 
             // Guest Information
-            $table->string('service_guest_name');
-            $table->string('service_guest_email');
-            $table->string('service_guest_contact')->nullable();
+            $table->string('guest_name');
+            $table->string('guest_email');
+            $table->string('guest_contact')->nullable();
 
             // Foreign Keys
             $table->foreignId('service_id')->constrained('services')->onDelete('cascade');
             $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('set null');
         
             // Booking Details
+            $table->date('date');
             $table->time('start_time')->nullable();
             $table->time('end_time')->nullable();
             $table->integer('quantity')->default(1);
+            $table->decimal('total_price', 10, 2)->nullable();
+            $table->text('remarks')->nullable();
 
-            $table->date('service_booking_date');
-            $table->enum('service_booking_status', ['Pending','Confirmed','Declined','Cancelled','Completed'])->default('Pending');
-            $table->enum('service_booking_payment_status', ['Unpaid','Partially Paid','Paid'])->default('Unpaid');
-            $table->decimal('total_service_price', 10, 2)->nullable();
-
+            // Booking Life Cycle
+            $table->enum('type', ['Website','Walk-in','Phone','E-mail'])->default('Website');
+            $table->date('booking_date');
+            $table->enum('booking_status', ['Pending','Confirmed','Declined','Cancelled','Completed'])->default('Pending');
+            $table->enum('payment_status', ['Unpaid','Partially_Paid','Paid','Refunded'])->default('Unpaid');
+            $table->text('status_change_reason')->nullable();
+            
             $table->timestamps();
         });
     }
