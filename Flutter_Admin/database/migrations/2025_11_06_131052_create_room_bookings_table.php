@@ -24,6 +24,7 @@ return new class extends Migration
             $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('set null');
 
             // Booking Details
+            $table->integer('number_of_guests')->default(1);
             $table->decimal('total_price', 10, 2)->nullable();
             $table->text('remarks')->nullable();
 
@@ -37,7 +38,7 @@ return new class extends Migration
             $table->time('end_time')->nullable();
             
             // Booking Life Cycle
-            $table->enum('type', ['Online','Walk-in','Phone','E-mail'])->default('Online');
+            $table->enum('type', ['Website','Walk-in','Phone','E-mail'])->default('Website');
             $table->date('booking_date');
             $table->enum('booking_status', ['Pending','Confirmed','Declined','Checked_In','Checked_Out','Cancelled'])->default('Pending');
             $table->enum('payment_status', ['Unpaid','Partially_Paid','Paid','Refunded'])->default('Unpaid');
