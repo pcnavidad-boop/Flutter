@@ -15,22 +15,25 @@ return new class extends Migration
             $table->id();
 
             // Descriptive Info
-            $table->string('service_name')->unique();
-            $table->text('service_description')->nullable();
-            $table->integer('service_capacity')->nullable();
-            $table->string('service_image')->nullable();
+            $table->string('name')->unique();
+            $table->text('description')->nullable();
+            $table->integer('capacity')->nullable();
+            $table->string('image')->nullable();
 
             // Pricing
             $table->enum('price_type', ['per_hour', 'per_service', 'per_person'])->default('per_hour');
             $table->decimal('base_price', 10, 2)->default(0);
 
             // Availability
-            $table->time('service_start_time')->nullable();
-            $table->time('service_end_time')->nullable();
-            $table->boolean('service_availability_status')->default(true);
+            $table->time('start_time')->nullable();
+            $table->time('end_time')->nullable();
+            $table->enum('status', ['Available','Occupied','Maintenance','Unavailable'])->default('Available');
             
             // Archive Status
             $table->boolean('is_archived')->default(false);
+
+            // Foreign Key 
+            $table->foreignId('user_id')->constrained('users')->onDelete('set null');
 
             $table->timestamps();
         });
