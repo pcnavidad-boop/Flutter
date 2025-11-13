@@ -53,6 +53,11 @@ class RoomBookingController extends Controller
 
         RoomBooking::create($data);
 
+        // 🔔 Send notification to admins
+        foreach (User::all() as $admin) {
+            $admin->notify(new NewRoomBookingNotification($booking));
+        }
+
         return redirect()->route('room_booking.index_page')->with('success', 'Room booking created successfully.');
     }
 
