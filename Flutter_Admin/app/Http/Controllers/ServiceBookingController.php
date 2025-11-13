@@ -47,6 +47,11 @@ class ServiceBookingController extends Controller
 
         ServiceBooking::create($data);
 
+        // 🔔 Notify admins
+        foreach (User::all() as $admin) {
+            $admin->notify(new NewServiceBookingNotification($booking));
+        }
+
         return redirect()->route('service_booking.index_page')->with('success', 'Service booking created.');
     }
 
