@@ -32,7 +32,7 @@ return new class extends Migration
             $table->text('remarks')->nullable();
 
             // Booking Life Cycle
-            $table->enum('type', ['Online','Walk-in','Phone','E-mail'])->default('Online');
+            $table->enum('type', ['Website','Walk-in','Phone','E-mail'])->default('Website');
             $table->date('booking_date');
             $table->enum('booking_status', ['Pending','Confirmed','Declined','Cancelled','Completed'])->default('Pending');
             $table->enum('payment_status', ['Unpaid','Partially_Paid','Paid','Refunded'])->default('Unpaid');

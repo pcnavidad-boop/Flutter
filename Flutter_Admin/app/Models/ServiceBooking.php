@@ -21,7 +21,7 @@ class ServiceBooking extends Model
         'date',
         'start_time',
         'end_time',
-        'quantity',
+        'number_of_guests',
         'total_price',
         'remarks',
         'type',
@@ -37,8 +37,8 @@ class ServiceBooking extends Model
             'total_price' => 'decimal:2',
             'date' => 'date',
             'booking_date' => 'date',
-            'start_time' => 'datetime:H:i',
-            'end_time' => 'datetime:H:i',
+            'start_time' => 'time',
+            'end_time' => 'time',
         ];
     }
 

@@ -17,7 +17,8 @@ return new class extends Migration
             // Foreign Keys
             $table->foreignId('room_booking_id')->nullable()->constrained('room_bookings')->onDelete('cascade');
             $table->foreignId('service_booking_id')->nullable()->constrained('service_bookings')->onDelete('cascade');
-
+            $table->foreignId('admin_id')->nullable()->constrained('users')->onDelete('set null');
+            
             // Payment Details
             $table->decimal('amount', 10, 2);
             $table->date('date');
