@@ -3,20 +3,25 @@
 namespace App\Http\Controllers;
 
 use App\Models\Service;
+use App\Models\User;
 use App\Models\ServiceBooking;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use App\Notifications\NewServiceBookingNotification;
 
 class ServiceBookingController extends Controller
 {
     // View service bookings
     public function index()
     {
-        $bookings = ServiceBooking::with('service')->orderBy('booking_date', 'desc')->get();
+        $bookings = ServiceBooking::with('service')
+            ->orderBy('booking_date', 'desc')
+            ->get();
+
         return view('service_booking.index', compact('bookings'));
     }
 
-    public function createPage()
+    public function viewCreatePage()
     {
         $services = Service::active()->available()->get();
         return view('service_booking.create', compact('services'));
@@ -51,25 +56,26 @@ class ServiceBookingController extends Controller
         // Create unique booking reference
         $data['reference'] = 'SB-' . strtoupper(Str::random(8));
 
-        ServiceBooking::create($data);
+        // Save booking
+        $booking = ServiceBooking::create($data);
 
         // Notify admins
-        foreach (User::all() as $admin) {
+        foreach (User::where('role', 'admin')->get() as $admin) {
             $admin->notify(new NewServiceBookingNotification($booking));
         }
 
-        return redirect()->route('service_booking.index_page')->with('success', 'Service booking created.');
+        return redirect()
+            ->route('service_booking.index_page')
+            ->with('success', 'Service booking created.');
     }
 
     public function update(Request $request, ServiceBooking $booking)
     {
         $data = $request->validate([
-            // Guest Details
             'guest_name'       => 'required|string|max:255',
             'guest_email'      => 'required|email|max:255',
             'guest_contact'    => 'nullable|string|max:255',
 
-            // Booking Details
             'service_id'       => 'required|exists:services,id',
 
             'number_of_guests' => 'required|integer|min:1',

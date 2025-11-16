@@ -19,7 +19,7 @@ class NewRoomBookingNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['mail', 'database'];   // Send email + in-app notification
+        return ['mail', 'database'];
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -28,23 +28,25 @@ class NewRoomBookingNotification extends Notification
             ->subject('New Room Booking Received')
             ->greeting('Hello Admin,')
             ->line('A new room booking has been submitted.')
+            ->line('Reference: ' . $this->booking->reference)
             ->line('Guest Name: ' . $this->booking->guest_name)
-            ->line('Room: ' . $this->booking->room->room_number)
-            ->line('Check-in Date: ' . $this->booking->check_in_date)
-            ->line('Check-out Date: ' . $this->booking->check_out_date)
-            ->action('View Booking', url('/room_bookings/' . $this->booking->id))
+            ->line('Room: ' . optional($this->booking->room)->room_number)
+            ->line('Check-in Date: ' . optional($this->booking->check_in_date)->format('M d, Y'))
+            ->line('Check-out Date: ' . optional($this->booking->check_out_date)->format('M d, Y'))
+            ->action('View Booking', url('/room-bookings/' . $this->booking->id))
             ->line('Thank you for using the system.');
     }
 
     public function toArray(object $notifiable): array
     {
         return [
-            'title' => 'New Room Booking',
-            'booking_id' => $this->booking->id,
-            'guest_name' => $this->booking->guest_name,
-            'room_number' => $this->booking->room->room_number,
-            'check_in_date' => $this->booking->check_in_date,
-            'check_out_date' => $this->booking->check_out_date,
+            'title'          => 'New Room Booking',
+            'booking_id'     => $this->booking->id,
+            'reference'      => $this->booking->reference,
+            'guest_name'     => $this->booking->guest_name,
+            'room_number'    => optional($this->booking->room)->room_number,
+            'check_in_date'  => optional($this->booking->check_in_date)->format('Y-m-d'),
+            'check_out_date' => optional($this->booking->check_out_date)->format('Y-m-d'),
         ];
     }
 }
