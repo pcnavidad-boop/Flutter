@@ -10,37 +10,30 @@ class Payment extends Model
     use HasFactory;
 
     protected $fillable = [
-        'room_booking_id',
-        'service_booking_id',
-        'admin_id',
+        'payable_id',
+        'payable_type',
+        'user_id',
         'amount',
         'date',
         'method',
         'status',
     ];
 
-    protected function casts(): array
+    protected $casts = [
+        'amount' => 'decimal:2',
+        'date'   => 'date',
+    ];
+
+    // Polymorphic Relationship
+    public function payable()
     {
-        return [
-            'amount' => 'decimal:2',
-            'date' => 'date',
-        ];
+        return $this->morphTo();
     }
 
-    // Relationships
-    public function roomBooking()
+    // User who recorded the payment
+    public function user()
     {
-        return $this->belongsTo(RoomBooking::class, 'room_booking_id');
-    }
-
-    public function serviceBooking()
-    {
-        return $this->belongsTo(ServiceBooking::class, 'service_booking_id');
-    }
-
-    public function admin()
-    {
-        return $this->belongsTo(User::class, 'admin_id');
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     // Scopes

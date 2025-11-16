@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Service;
 use App\Models\ServiceBooking;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class ServiceBookingController extends Controller
 {
@@ -24,16 +25,18 @@ class ServiceBookingController extends Controller
     public function create(Request $request)
     {
         $data = $request->validate([
+            // Guest Details
             'guest_name'       => 'required|string|max:255',
             'guest_email'      => 'required|email|max:255',
             'guest_contact'    => 'nullable|string|max:255',
 
+            // Booking Details
             'service_id'       => 'required|exists:services,id',
 
-            'date'             => 'required|date',
+            'number_of_guests' => 'required|integer|min:1',
+            'appointment_date' => 'required|date',
             'start_time'       => 'nullable|date_format:H:i',
             'end_time'         => 'nullable|date_format:H:i|after_or_equal:start_time',
-            'number_of_guests' => 'required|integer|min:1',
 
             'remarks'          => 'nullable|string|max:2000',
             'type'             => 'required|in:Website,Walk-in,Phone,E-mail',
@@ -45,9 +48,12 @@ class ServiceBookingController extends Controller
 
         $data['user_id'] = auth()->id();
 
+        // Create unique booking reference
+        $data['reference'] = 'SB-' . strtoupper(Str::random(8));
+
         ServiceBooking::create($data);
 
-        // 🔔 Notify admins
+        // Notify admins
         foreach (User::all() as $admin) {
             $admin->notify(new NewServiceBookingNotification($booking));
         }
@@ -58,15 +64,23 @@ class ServiceBookingController extends Controller
     public function update(Request $request, ServiceBooking $booking)
     {
         $data = $request->validate([
+            // Guest Details
             'guest_name'       => 'required|string|max:255',
             'guest_email'      => 'required|email|max:255',
             'guest_contact'    => 'nullable|string|max:255',
-            'date'             => 'required|date',
+
+            // Booking Details
+            'service_id'       => 'required|exists:services,id',
+
+            'number_of_guests' => 'required|integer|min:1',
+            'appointment_date' => 'required|date',
             'start_time'       => 'nullable|date_format:H:i',
             'end_time'         => 'nullable|date_format:H:i|after_or_equal:start_time',
-            'number_of_guests' => 'required|integer|min:1',
 
             'remarks'          => 'nullable|string|max:2000',
+            'type'             => 'required|in:Website,Walk-in,Phone,E-mail',
+            'booking_date'     => 'required|date',
+
             'booking_status'   => 'required|in:Pending,Confirmed,Declined,Cancelled,Completed',
             'payment_status'   => 'required|in:Unpaid,Partially_Paid,Paid,Refunded',
         ]);
