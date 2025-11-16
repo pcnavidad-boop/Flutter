@@ -27,11 +27,12 @@ return new class extends Migration
             $table->date('date');
             $table->time('start_time')->nullable();
             $table->time('end_time')->nullable();
-            $table->integer('quantity')->default(1);
+            $table->integer('number_of_guests')->default(1);
             $table->decimal('total_price', 10, 2)->nullable();
             $table->text('remarks')->nullable();
 
             // Booking Life Cycle
+            $table->date('reference')->unique();
             $table->enum('type', ['Website','Walk-in','Phone','E-mail'])->default('Website');
             $table->date('booking_date');
             $table->enum('booking_status', ['Pending','Confirmed','Declined','Cancelled','Completed'])->default('Pending');

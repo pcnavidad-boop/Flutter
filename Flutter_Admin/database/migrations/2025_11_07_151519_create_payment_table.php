@@ -6,19 +6,18 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
 
-            // Foreign Keys
-            $table->foreignId('room_booking_id')->nullable()->constrained('room_bookings')->onDelete('cascade');
-            $table->foreignId('service_booking_id')->nullable()->constrained('service_bookings')->onDelete('cascade');
-            $table->foreignId('admin_id')->nullable()->constrained('users')->onDelete('set null');
-            
+            // Polymorphic relation
+            $table->unsignedBigInteger('payable_id');
+            $table->string('payable_type');
+
+            // User who recorded the payment
+            $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('set null');
+
             // Payment Details
             $table->decimal('amount', 10, 2);
             $table->date('date');
@@ -26,12 +25,11 @@ return new class extends Migration
             $table->enum('status', ['Pending', 'Completed', 'Failed', 'Refunded'])->default('Pending');
 
             $table->timestamps();
+
+            $table->index(['payable_id', 'payable_type']);
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('payments');

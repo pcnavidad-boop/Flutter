@@ -24,6 +24,7 @@ class RoomBooking extends Model
         'user_id',
         'total_price',
         'remarks',
+        'booking_reference',
         'type',
         'booking_date',
         'booking_status',

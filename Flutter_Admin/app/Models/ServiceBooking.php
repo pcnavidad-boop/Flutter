@@ -24,6 +24,7 @@ class ServiceBooking extends Model
         'number_of_guests',
         'total_price',
         'remarks',
+        'booking_reference',
         'type',
         'booking_date',
         'booking_status',

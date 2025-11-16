@@ -6,6 +6,7 @@ use App\Models\Room;
 use App\Models\RoomBooking;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
 
 class RoomBookingController extends Controller
 {
@@ -31,10 +32,10 @@ class RoomBookingController extends Controller
             'guest_name'       => 'required|string|max:255',
             'guest_email'      => 'required|email|max:255',
             'guest_contact'    => 'nullable|string|max:255',
-            'room_id'          => 'required|exists:rooms,id',
-            'number_of_guests' => 'required|integer|min:1',
 
-            // dates
+            'room_id'          => 'required|exists:rooms,id',
+
+            'number_of_guests' => 'required|integer|min:1',
             'check_in_date'  => 'nullable|date',
             'check_out_date' => 'nullable|date|after_or_equal:check_in_date',
             'event_date'     => 'nullable|date',
@@ -51,9 +52,12 @@ class RoomBookingController extends Controller
 
         $data['user_id'] = auth()->id();
 
+        // Create unique booking reference
+        $data['reference'] = 'RB-' . strtoupper(Str::random(8));
+
         RoomBooking::create($data);
 
-        // 🔔 Send notification to admins
+        // Notify admins
         foreach (User::all() as $admin) {
             $admin->notify(new NewRoomBookingNotification($booking));
         }
@@ -68,9 +72,10 @@ class RoomBookingController extends Controller
             'guest_name'       => 'required|string|max:255',
             'guest_email'      => 'required|email|max:255',
             'guest_contact'    => 'nullable|string|max:255',
-            'room_id'          => 'required|exists:rooms,id',
-            'number_of_guests' => 'required|integer|min:1',
 
+            'room_id'          => 'required|exists:rooms,id',
+
+            'number_of_guests' => 'required|integer|min:1',
             'check_in_date'  => 'nullable|date',
             'check_out_date' => 'nullable|date|after_or_equal:check_in_date',
             'event_date'     => 'nullable|date',
@@ -78,6 +83,9 @@ class RoomBookingController extends Controller
             'end_time'       => 'nullable|date_format:H:i|after_or_equal:start_time',
 
             'remarks'         => 'nullable|string|max:2000',
+            'type'            => 'required|in:Website,Walk-in,Phone,E-mail',
+            'booking_date'    => 'required|date',
+
             'booking_status'  => 'required|in:Pending,Confirmed,Declined,Checked_In,Checked_Out,Cancelled',
             'payment_status'  => 'required|in:Unpaid,Partially_Paid,Paid,Refunded',
         ]);
