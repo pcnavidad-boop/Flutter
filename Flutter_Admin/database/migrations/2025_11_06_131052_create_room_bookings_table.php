@@ -38,6 +38,7 @@ return new class extends Migration
             $table->time('end_time')->nullable();
             
             // Booking Life Cycle
+            $table->date('booking_reference')->unique();
             $table->enum('type', ['Website','Walk-in','Phone','E-mail'])->default('Website');
             $table->date('booking_date');
             $table->enum('booking_status', ['Pending','Confirmed','Declined','Checked_In','Checked_Out','Cancelled'])->default('Pending');

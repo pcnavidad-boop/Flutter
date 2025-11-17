@@ -3,22 +3,26 @@
 namespace App\Http\Controllers;
 
 use App\Models\Room;
+use App\Models\User;
 use App\Models\RoomBooking;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
+use App\Notifications\NewRoomBookingNotification;
 
 class RoomBookingController extends Controller
 {
     // View all room bookings
     public function index()
     {
-        $bookings = RoomBooking::with('room')->orderBy('booking_date', 'desc')->get();
+        $bookings = RoomBooking::with('room')
+            ->orderBy('booking_date', 'desc')
+            ->get();
 
         return view('room_booking.index', compact('bookings'));
     }
 
     // Show create page
-    public function createPage()
+    public function viewCreatePage()
     {
         $rooms = Room::active()->available()->get();
         return view('room_booking.create', compact('rooms'));
@@ -28,53 +32,72 @@ class RoomBookingController extends Controller
     public function create(Request $request)
     {
         $data = $request->validate([
+            // Guest Details
             'guest_name'       => 'required|string|max:255',
             'guest_email'      => 'required|email|max:255',
             'guest_contact'    => 'nullable|string|max:255',
+
+            // Booking Details
             'room_id'          => 'required|exists:rooms,id',
+
             'number_of_guests' => 'required|integer|min:1',
+            'check_in_date'    => 'nullable|date',
+            'check_out_date'   => 'nullable|date|after_or_equal:check_in_date',
+            'event_date'       => 'nullable|date',
+            'start_time'       => 'nullable|date_format:H:i',
+            'end_time'         => 'nullable|date_format:H:i|after_or_equal:start_time',
 
-            // dates
-            'check_in_date'  => 'nullable|date',
-            'check_out_date' => 'nullable|date|after_or_equal:check_in_date',
-            'event_date'     => 'nullable|date',
-            'start_time'     => 'nullable|date_format:H:i',
-            'end_time'       => 'nullable|date_format:H:i|after_or_equal:start_time',
+            'remarks'          => 'nullable|string|max:2000',
+            'type'             => 'required|in:Website,Walk-in,Phone,E-mail',
+            'booking_date'     => 'required|date',
 
-            'remarks'         => 'nullable|string|max:2000',
-            'type'            => 'required|in:Website,Walk-in,Phone,E-mail',
-            'booking_date'    => 'required|date',
-
-            'booking_status'  => 'required|in:Pending,Confirmed,Declined,Checked_In,Checked_Out,Cancelled',
-            'payment_status'  => 'required|in:Unpaid,Partially_Paid,Paid,Refunded',
+            'booking_status'   => 'required|in:Pending,Confirmed,Declined,Checked_In,Checked_Out,Cancelled',
+            'payment_status'   => 'required|in:Unpaid,Partially_Paid,Paid,Refunded',
         ]);
 
         $data['user_id'] = auth()->id();
 
-        RoomBooking::create($data);
+        // Create unique booking reference
+        $data['reference'] = 'RB-' . strtoupper(Str::random(8));
 
-        return redirect()->route('room_booking.index_page')->with('success', 'Room booking created successfully.');
+        // Save booking
+        $booking = RoomBooking::create($data);
+
+        // Notify admins
+        foreach (User::where('role', 'admin')->get() as $admin) {
+            $admin->notify(new NewRoomBookingNotification($booking));
+        }
+
+        return redirect()
+            ->route('room_booking.index_page')
+            ->with('success', 'Room booking created successfully.');
     }
 
     // Update booking
     public function update(Request $request, RoomBooking $booking)
     {
         $data = $request->validate([
+            // Guest Details
             'guest_name'       => 'required|string|max:255',
             'guest_email'      => 'required|email|max:255',
             'guest_contact'    => 'nullable|string|max:255',
+
+            // Booking Details
             'room_id'          => 'required|exists:rooms,id',
+
             'number_of_guests' => 'required|integer|min:1',
+            'check_in_date'    => 'nullable|date',
+            'check_out_date'   => 'nullable|date|after_or_equal:check_in_date',
+            'event_date'       => 'nullable|date',
+            'start_time'       => 'nullable|date_format:H:i',
+            'end_time'         => 'nullable|date_format:H:i|after_or_equal:start_time',
 
-            'check_in_date'  => 'nullable|date',
-            'check_out_date' => 'nullable|date|after_or_equal:check_in_date',
-            'event_date'     => 'nullable|date',
-            'start_time'     => 'nullable|date_format:H:i',
-            'end_time'       => 'nullable|date_format:H:i|after_or_equal:start_time',
+            'remarks'          => 'nullable|string|max:2000',
+            'type'             => 'required|in:Website,Walk-in,Phone,E-mail',
+            'booking_date'     => 'required|date',
 
-            'remarks'         => 'nullable|string|max:2000',
-            'booking_status'  => 'required|in:Pending,Confirmed,Declined,Checked_In,Checked_Out,Cancelled',
-            'payment_status'  => 'required|in:Unpaid,Partially_Paid,Paid,Refunded',
+            'booking_status'   => 'required|in:Pending,Confirmed,Declined,Checked_In,Checked_Out,Cancelled',
+            'payment_status'   => 'required|in:Unpaid,Partially_Paid,Paid,Refunded',
         ]);
 
         $booking->update($data);
