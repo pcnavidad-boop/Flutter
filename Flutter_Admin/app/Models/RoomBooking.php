@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class RoomBooking extends Model
 {
-    
     use HasFactory;
 
     protected $fillable = [
@@ -24,6 +23,7 @@ class RoomBooking extends Model
         'user_id',
         'total_price',
         'remarks',
+        'reference',
         'type',
         'booking_date',
         'booking_status',
@@ -34,31 +34,31 @@ class RoomBooking extends Model
     protected function casts(): array
     {
         return [
-            'total_price' => 'decimal:2',
-            'check_in_date' => 'date',
+            'total_price'    => 'decimal:2',
+            'check_in_date'  => 'date',
             'check_out_date' => 'date',
-            'event_date' => 'date',
-            'start_time' => 'time',
-            'end_time' => 'time',
-            'booking_date' => 'date',
+            'event_date'     => 'date',
+            'start_time'     => 'time',
+            'end_time'       => 'time',
+            'booking_date'   => 'date',
         ];
     }
 
     // Relationships
-
     public function room()
     {
-        return $this->belongsTo(Room::class, 'room_id');
+        return $this->belongsTo(Room::class);
     }
 
     public function user()
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(User::class);
     }
 
+    // Polymorphic payment
     public function payment()
     {
-        return $this->hasOne(Payment::class, 'room_booking_id');
+        return $this->morphOne(Payment::class, 'payable');
     }
 
     // Scopes
@@ -80,7 +80,7 @@ class RoomBooking extends Model
     // Accessors
     public function getFormattedPriceAttribute()
     {
-        return $this->total_price ? number_format($this->total_price, 2) : '0.00';
+        return number_format($this->total_price ?? 0, 2);
     }
 
     public function getStayPeriodAttribute()
