@@ -38,7 +38,7 @@ return new class extends Migration
             $table->boolean('is_archived')->default(false);
 
             // Foreign Key
-            $table->foreignId('user_id')->constrained('users')->onDelete('set null');
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
 
             $table->timestamps();
         });

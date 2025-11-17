@@ -9,6 +9,23 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// not auth middleware for dummy frontend
+Route::prefix('hotel')->group(function () {
+
+    Route::get('/', fn() => view('customer.landing'))->name('hotel.landing');
+
+    Route::get('/rooms', fn() => view('customer.rooms'))->name('hotel.rooms');
+
+    Route::get('/services', fn() => view('customer.services'))->name('hotel.services');
+
+    Route::get('/book-room', fn() => view('customer.booking-room'))->name('hotel.book.room');
+
+    Route::get('/book-service', fn() => view('customer.booking-service'))->name('hotel.book.service');
+
+});
+
+// admin-side + auth routes
+
 Route::get('/dashboard', function () {
     return view('dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');

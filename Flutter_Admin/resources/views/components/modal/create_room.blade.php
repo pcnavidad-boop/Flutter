@@ -9,7 +9,7 @@
             <div class="modal-body">
                 <div class="mb-3">
                     <label>Room Number</label>
-                    <input type="text" name="room_number" class="form-control" required>
+                    <input type="text" name="room_number" class="form-control">
                 </div>
                 <div class="mb-3">
                     <label>Room Type</label>
@@ -18,17 +18,17 @@
 
                 <div class="mb-3">
                     <label>Price per Night</label>
-                    <input type="number" name="price_per_night" step="0.01" class="form-control" required>
+                    <input type="number" name="price_per_night" step="0.01" class="form-control">
                 </div>
 
                 <div class="mb-3">
                     <label>Number of beds</label>
-                    <input type="number" name="number_of_beds" step="1" class="form-control" required>
+                    <input type="number" name="number_of_beds" step="1" class="form-control" >
                 </div>
                 
                 <div class="mb-3">
                     <label>Room Capacity</label>
-                    <input type="number" name="room_capacity" step="1" class="form-control" required>
+                    <input type="number" name="room_capacity" step="1" class="form-control" >
                 </div>                
                 
                 <div class="mb-3">
