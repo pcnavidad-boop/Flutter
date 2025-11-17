@@ -15,8 +15,8 @@ return new class extends Migration
             $table->unsignedBigInteger('payable_id');
             $table->string('payable_type');
 
-            // User who recorded the payment
-            $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('set null');
+            // Admin Details
+            $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('cascade');
 
             // Payment Details
             $table->decimal('amount', 10, 2);

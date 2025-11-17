@@ -51,7 +51,7 @@ class ServiceBooking extends Model
         return $this->belongsTo(User::class);
     }
 
-    // ❗ Polymorphic payment
+    // Polymorphic payment
     public function payment()
     {
         return $this->morphOne(Payment::class, 'payable');

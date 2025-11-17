@@ -24,7 +24,7 @@ return new class extends Migration
             $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('cascade');
         
             // Booking Details
-            $table->date('date');
+            $table->date('appointment_date');
             $table->time('start_time')->nullable();
             $table->time('end_time')->nullable();
             $table->integer('number_of_guests')->default(1);

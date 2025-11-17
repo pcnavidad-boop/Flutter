@@ -15,11 +15,6 @@ class ServiceController extends Controller
         return view('service.index', compact('services'));
     }
 
-    public function viewCreatePage()
-    {
-        return view('service.create');
-    }
-
     // Create service
     public function create(Request $request)
     {

@@ -21,7 +21,6 @@ return new class extends Migration
             // Pricing
             $table->enum('price_type', ['per_night','per_hour','per_event'])->default('per_night');
             $table->decimal('base_price', 10, 2)->default(0);
-            $table->boolean('is_time_based')->default(false);
 
             // Capacity
             $table->integer('number_of_beds')->nullable();
