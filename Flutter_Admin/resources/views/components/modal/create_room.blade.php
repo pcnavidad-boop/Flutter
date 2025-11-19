@@ -13,12 +13,12 @@
                 </div>
                 <div class="mb-3">
                     <label>Room Type</label>
-                    <input type="text" name="room_type" class="form-control">
+                    <input type="text" name="type" class="form-control">
                 </div>
 
                 <div class="mb-3">
                     <label>Price per Night</label>
-                    <input type="number" name="price_per_night" step="0.01" class="form-control">
+                    <input type="number" name="base_price" step="0.01" class="form-control">
                 </div>
 
                 <div class="mb-3">
@@ -28,12 +28,12 @@
                 
                 <div class="mb-3">
                     <label>Room Capacity</label>
-                    <input type="number" name="room_capacity" step="1" class="form-control" >
+                    <input type="number" name="capacity" step="1" class="form-control" >
                 </div>                
                 
                 <div class="mb-3">
                     <label>Description</label>
-                    <textarea name="room_description" class="form-control" rows="3"></textarea>
+                    <textarea name="description" class="form-control" rows="3"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -42,4 +42,4 @@
             </div>
         </form>
     </div>
-</div>
+</div>c

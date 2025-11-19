@@ -27,12 +27,10 @@ class RoomController extends Controller
         $data = $request->validate([
             'room_number'   => 'required|string|max:255|unique:rooms,room_number',
             'type'          => 'required|in:Single,Double,Quad,Family,Suite,Penthouse,Function',
-            'price_type'    => 'required|in:per_night,per_hour,per_event',
             'base_price'    => 'required|numeric|min:0|max:99999999.99',
             'is_time_based' => 'boolean',
             'number_of_beds'=> 'nullable|integer|min:1',
             'capacity'      => 'required|integer|min:1',
-            'status'        => 'required|in:Available,Occupied,Maintenance,Unavailable',
             'description'   => 'nullable|string|max:1000',
             'image'         => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);

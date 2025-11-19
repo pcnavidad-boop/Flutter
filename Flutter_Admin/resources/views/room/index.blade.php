@@ -25,31 +25,58 @@
                         <th>#</th>
                         <th>Room Number</th>
                         <th>Type</th>
-                        <th>Price/Night</th>
+                        <th>Price Type</th>
+                        <th>Base Price</th>
+                        <th>Time-Based?</th>
                         <th>Beds</th>
                         <th>Capacity</th>
-                        <th>Availability</th>
+                        <th>Status</th>
                         <th>Description</th>
+                        <th>Archived?</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
+
                 <tbody>
                     @forelse ($rooms as $room)
                     <tr>
                         <td>{{ $room->id }}</td>
                         <td>{{ $room->room_number }}</td>
-                        <td>{{ $room->room_type ?? 'N/A' }}</td>
-                        <td>₱{{ number_format($room->price_per_night, 2) }}</td>
-                        <td>{{ $room->number_of_beds ?? 'N/A' }}</td>
-                        <td>{{ $room->room_capacity }}</td>
+                        <td>{{ $room->type }}</td>
+                        <td>{{ ucfirst(str_replace('_',' ', $room->price_type)) }}</td>
+                        <td>₱{{ number_format($room->base_price, 2) }}</td>
                         <td>
-                            @if ($room->room_availability_status)
+                            @if($room->is_time_based)
+                                <span class="badge bg-info">Yes</span>
+                            @else
+                                <span class="badge bg-secondary">No</span>
+                            @endif
+                        </td>
+                        <td>{{ $room->number_of_beds ?? 'N/A' }}</td>
+                        <td>{{ $room->capacity }}</td>
+
+                        <td>
+                            @if ($room->status === 'Available')
                                 <span class="badge bg-success">Available</span>
+                            @elseif ($room->status === 'Occupied')
+                                <span class="badge bg-warning">Occupied</span>
+                            @elseif ($room->status === 'Maintenance')
+                                <span class="badge bg-info">Maintenance</span>
                             @else
                                 <span class="badge bg-danger">Unavailable</span>
                             @endif
                         </td>
-                        <td>{{ \Illuminate\Support\Str::limit($room->room_description, 40, '...') }}</td>
+
+                        <td>{{ \Illuminate\Support\Str::limit($room->description, 40, '...') }}</td>
+
+                        <td>
+                            @if ($room->is_archived)
+                                <span class="badge bg-danger">Archived</span>
+                            @else
+                                <span class="badge bg-success">Active</span>
+                            @endif
+                        </td>
+
                         <td>
                             <button 
                                 class="btn btn-sm btn-outline-secondary editBtn"
@@ -57,23 +84,28 @@
                                 data-bs-target="#editRoomModal"
                                 data-id="{{ $room->id }}"
                                 data-room_number="{{ $room->room_number }}"
-                                data-type="{{ $room->room_type }}"
-                                data-price="{{ $room->price_per_night }}"
+                                data-type="{{ $room->type }}"
+                                data-price_type="{{ $room->price_type }}"
+                                data-price="{{ $room->base_price }}"
+                                data-is_time_based="{{ $room->is_time_based }}"
                                 data-beds="{{ $room->number_of_beds }}"
-                                data-capacity="{{ $room->room_capacity }}"
-                                data-availability="{{ $room->room_availability_status }}"
-                                data-description="{{ $room->room_description }}">
+                                data-capacity="{{ $room->capacity }}"
+                                data-status="{{ $room->status }}"
+                                data-description="{{ $room->description }}">
                                 Edit
                             </button>
                         </td>
+
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="9" class="text-center text-muted">No rooms found.</td>
+                        <td colspan="12" class="text-center text-muted">No rooms found.</td>
                     </tr>
                     @endforelse
                 </tbody>
+
             </table>
+
         </div>
     </div>
 </div>
@@ -92,25 +124,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
     editButtons.forEach(button => {
         button.addEventListener('click', () => {
-            const id = button.dataset.id;
-            editForm.action = `/rooms/${id}`;
+
+            editForm.action = `/rooms/${button.dataset.id}`;
 
             document.getElementById('edit_room_number').value = button.dataset.room_number ?? '';
-            document.getElementById('edit_room_type').value = button.dataset.type ?? '';
-            document.getElementById('edit_price_per_night').value = button.dataset.price ?? '';
+            document.getElementById('edit_type').value = button.dataset.type ?? '';
+            document.getElementById('edit_price_type').value = button.dataset.price_type ?? '';
+            document.getElementById('edit_base_price').value = button.dataset.price ?? '';
+            document.getElementById('edit_is_time_based').checked = (button.dataset.is_time_based == '1');
             document.getElementById('edit_number_of_beds').value = button.dataset.beds ?? '';
-            document.getElementById('edit_room_capacity').value = button.dataset.capacity ?? '';
-     
-            const avail = (typeof button.dataset.availability !== 'undefined') ? button.dataset.availability : (button.dataset.room_availability || '0');
-            document.getElementById('edit_room_availability').value = avail ? String(Number(avail)) : '0';
-            document.getElementById('edit_room_description').value = button.dataset.description ?? '';
+            document.getElementById('edit_capacity').value = button.dataset.capacity ?? '';
+            document.getElementById('edit_status').value = button.dataset.status ?? '';
+            document.getElementById('edit_description').value = button.dataset.description ?? '';
         });
     });
 
     const editModalEl = document.getElementById('editRoomModal');
     editModalEl.addEventListener('hidden.bs.modal', function () {
         editForm.reset();
-        document.getElementById('editModalAlerts').innerHTML = '';
     });
 });
 </script>
@@ -120,7 +151,6 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
 
-<!-- DataTables initialization -->
 <script>
 $(document).ready(function() {
     $('#rooms-table').DataTable({
@@ -131,12 +161,9 @@ $(document).ready(function() {
         pageLength: 10,
         lengthMenu: [ [10, 25, 50], [10, 25, 50] ],
         columnDefs: [
-            { orderable: false, targets: -1 } // disable ordering on last column (Actions)
+            { orderable: false, targets: -1 }
         ]
     });
-
-    // Optional: re-init tooltips (if you use them in actions)
-    $('[data-bs-toggle="tooltip"]').tooltip();
 });
 </script>
 
