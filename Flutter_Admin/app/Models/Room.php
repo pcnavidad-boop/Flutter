@@ -4,15 +4,16 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Str;
 
 class Room extends Model
 {
-    
     use HasFactory;
 
     protected $fillable = [
+        'name',
         'room_number',
-        'type',
+        'room_type',
         'price_type',
         'base_price',
         'number_of_beds',
@@ -22,14 +23,33 @@ class Room extends Model
         'image',
         'is_archived',
         'user_id',
+        'slug',
     ];
 
     protected function casts(): array
     {
         return [
-            'base_price' => 'decimal:2',
-            'is_archived' => 'boolean',
+            'base_price'   => 'decimal:2',
+            'is_archived'  => 'boolean',
         ];
+    }
+
+    // Auto-slug
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($room) {
+            if (!$room->slug) {
+                $room->slug = Str::slug($room->name . '-' . uniqid());
+            }
+        });
+    }
+
+    // Route by slug instead of ID
+    public function getRouteKeyName()
+    {
+        return 'slug';
     }
 
     // Relationships

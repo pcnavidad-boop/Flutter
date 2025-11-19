@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Str;
 
 class Service extends Model
 {
@@ -21,14 +22,33 @@ class Service extends Model
         'status',
         'is_archived',
         'user_id',
+        'slug',
     ];
 
     protected function casts(): array
     {
         return [
-            'base_price' => 'decimal:2',
-            'is_archived' => 'boolean',
+            'base_price'   => 'decimal:2',
+            'is_archived'  => 'boolean',
         ];
+    }
+
+    // Auto slug
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($service) {
+            if (!$service->slug) {
+                $service->slug = Str::slug($service->name . '-' . uniqid());
+            }
+        });
+    }
+
+    // Use slug in route binding
+    public function getRouteKeyName()
+    {
+        return 'slug';
     }
 
     // Relationships

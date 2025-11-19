@@ -9,7 +9,6 @@ use Illuminate\Http\Request;
 
 class PaymentController extends Controller
 {
-    // View all payments
     public function index()
     {
         $payments = Payment::with(['payable', 'user'])
@@ -31,15 +30,13 @@ class PaymentController extends Controller
             'status'       => 'required|in:Pending,Completed,Failed,Refunded',
         ]);
 
-        $data['user_id'] = auth()->id(); 
+        $data['user_id'] = auth()->id();
 
-        // Determine model type
         $payable = $data['booking_type'] === 'room'
             ? RoomBooking::findOrFail($data['booking_id'])
             : ServiceBooking::findOrFail($data['booking_id']);
 
-        // Create payment entry
-        $payment = $payable->payment()->create([
+        $payment = $payable->payments()->create([
             'user_id' => $data['user_id'],
             'amount'  => $data['amount'],
             'date'    => $data['date'],
@@ -47,7 +44,7 @@ class PaymentController extends Controller
             'status'  => $data['status'],
         ]);
 
-        // Update payment status on booking
+        // Update booking payment status
         $payable->update([
             'payment_status' => $data['status'] === 'Completed' ? 'Paid' : 'Unpaid',
         ]);
@@ -56,6 +53,7 @@ class PaymentController extends Controller
             ->with('success', 'Payment recorded successfully.');
     }
 
+    // Delete a payment
     public function destroy(Payment $payment)
     {
         $payment->delete();
