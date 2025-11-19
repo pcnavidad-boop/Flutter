@@ -32,8 +32,6 @@
                         <th>Capacity</th>
                         <th>Status</th>
                         <th>Archived</th>
-                        <th>Description</th>
-                        <th>Archived?</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -72,7 +70,7 @@
                         </td>
 
 
-                        <td>{{ Str::limit($room->description, 40) }}</td>
+
 
 
                         <td>
@@ -103,14 +101,12 @@
                             </button>
 
                         </td>
+                        
 
                     </tr>
 
-                    @empty
-                    <tr>
-                        <td colspan="12" class="text-center text-muted">No rooms found.</td>
-                    </tr>
-                    @endforelse
+
+                    @endforeach
 
                 </tbody>
 
