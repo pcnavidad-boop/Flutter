@@ -18,7 +18,7 @@ class RoomBookingController extends Controller
             ->orderBy('booking_date', 'desc')
             ->get();
 
-        return view('room_booking.index', compact('bookings'));
+        return view('RoomBooking.index', compact('bookings'));
     }
 
     // Show create page

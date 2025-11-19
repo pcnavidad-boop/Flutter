@@ -11,7 +11,7 @@
 <div class="container mt-5">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h3>Room Bookings</h3>
-        <a href="{{ route('roombookings.create_page')}}" class="btn btn-primary">
+        <a href="{{ route('room_booking.create')}}" class="btn btn-primary">
             + Add Booking
         </a>
     </div>
@@ -35,7 +35,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse ($room_bookings as $booking)
+                    @forelse ($bookings as $booking)
                     <tr>
                         <td>{{ $booking->id }}</td>
                         <td>{{ $booking->guest_name }}</td>
