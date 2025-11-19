@@ -2,7 +2,6 @@
 
 @section('content')
 
-<!-- DataTables CSS (CDN) -->
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.dataTables.min.css">
 
@@ -11,6 +10,7 @@
 <div class="container mt-5">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h3>Rooms</h3>
+
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createRoomModal">
             + Add Room
         </button>
@@ -18,7 +18,7 @@
 
     <div class="card">
         <div class="card-body">
-            
+
             <table id="rooms-table" class="table table-striped align-middle display nowrap" style="width:100%">
                 <thead class="table-dark">
                     <tr>
@@ -27,10 +27,11 @@
                         <th>Type</th>
                         <th>Price Type</th>
                         <th>Base Price</th>
-                        <th>Time-Based?</th>
+
                         <th>Beds</th>
                         <th>Capacity</th>
                         <th>Status</th>
+                        <th>Archived</th>
                         <th>Description</th>
                         <th>Archived?</th>
                         <th>Actions</th>
@@ -38,20 +39,13 @@
                 </thead>
 
                 <tbody>
-                    @forelse ($rooms as $room)
+                    @foreach ($rooms as $room)
                     <tr>
                         <td>{{ $room->id }}</td>
                         <td>{{ $room->room_number }}</td>
                         <td>{{ $room->type }}</td>
-                        <td>{{ ucfirst(str_replace('_',' ', $room->price_type)) }}</td>
+                        <td>{{ $room->price_type }}</td>
                         <td>₱{{ number_format($room->base_price, 2) }}</td>
-                        <td>
-                            @if($room->is_time_based)
-                                <span class="badge bg-info">Yes</span>
-                            @else
-                                <span class="badge bg-secondary">No</span>
-                            @endif
-                        </td>
                         <td>{{ $room->number_of_beds ?? 'N/A' }}</td>
                         <td>{{ $room->capacity }}</td>
 
@@ -67,17 +61,30 @@
                             @endif
                         </td>
 
-                        <td>{{ \Illuminate\Support\Str::limit($room->description, 40, '...') }}</td>
 
                         <td>
-                            @if ($room->is_archived)
+                            @if($room->is_archived)
+
                                 <span class="badge bg-danger">Archived</span>
                             @else
                                 <span class="badge bg-success">Active</span>
                             @endif
                         </td>
 
+
+                        <td>{{ Str::limit($room->description, 40) }}</td>
+
+
                         <td>
+                            <!-- VIEW BUTTON -->
+                            <button 
+                                class="btn btn-sm btn-outline-primary viewBtn"
+                                data-bs-toggle="modal"
+                                data-bs-target="#viewRoomModal"
+                                data-room="{{ htmlspecialchars(json_encode($room), ENT_QUOTES, 'UTF-8') }}"
+                            >View</button>
+
+                            <!-- EDIT BUTTON -->
                             <button 
                                 class="btn btn-sm btn-outline-secondary editBtn"
                                 data-bs-toggle="modal"
@@ -94,14 +101,17 @@
                                 data-description="{{ $room->description }}">
                                 Edit
                             </button>
+
                         </td>
 
                     </tr>
+
                     @empty
                     <tr>
                         <td colspan="12" class="text-center text-muted">No rooms found.</td>
                     </tr>
                     @endforelse
+
                 </tbody>
 
             </table>
@@ -110,11 +120,11 @@
     </div>
 </div>
 
-<!-- create modal -->
+<!-- --- MODALS --- -->
 <x-modal.create_room />
-
-<!-- edit modal -->
 <x-modal.edit_room />
+<x-modal.view_room />
+
 
 {{-- JS to populate edit modal --}}
 <script>
@@ -147,6 +157,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <!-- jQuery + DataTables JS (CDN) -->
+
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
@@ -155,15 +166,14 @@ document.addEventListener('DOMContentLoaded', function() {
 $(document).ready(function() {
     $('#rooms-table').DataTable({
         responsive: true,
-        paging: true,
-        searching: true,
-        ordering: true,
         pageLength: 10,
+
         lengthMenu: [ [10, 25, 50], [10, 25, 50] ],
         columnDefs: [
             { orderable: false, targets: -1 }
         ]
     });
+
 });
 </script>
 

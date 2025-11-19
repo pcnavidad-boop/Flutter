@@ -15,12 +15,6 @@ class RoomController extends Controller
         return view('room.index', compact('rooms'));
     }
 
-    // Show create page (optional)
-    public function viewCreatePage()
-    {
-        return view('room.create');
-    }
-
     // Create room
     public function create(Request $request)
     {
@@ -28,7 +22,6 @@ class RoomController extends Controller
             'room_number'   => 'required|string|max:255|unique:rooms,room_number',
             'type'          => 'required|in:Single,Double,Quad,Family,Suite,Penthouse,Function',
             'base_price'    => 'required|numeric|min:0|max:99999999.99',
-            'is_time_based' => 'boolean',
             'number_of_beds'=> 'nullable|integer|min:1',
             'capacity'      => 'required|integer|min:1',
             'description'   => 'nullable|string|max:1000',
@@ -60,7 +53,6 @@ class RoomController extends Controller
             'type'          => 'required|in:Single,Double,Quad,Family,Suite,Penthouse,Function',
             'price_type'    => 'required|in:per_night,per_hour,per_event',
             'base_price'    => 'required|numeric|min:0|max:99999999.99',
-            'is_time_based' => 'boolean',
             'number_of_beds'=> 'nullable|integer|min:1',
             'capacity'      => 'required|integer|min:1',
             'status'        => 'required|in:Available,Occupied,Maintenance,Unavailable',

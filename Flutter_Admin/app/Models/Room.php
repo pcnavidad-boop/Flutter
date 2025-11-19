@@ -15,7 +15,6 @@ class Room extends Model
         'type',
         'price_type',
         'base_price',
-        'is_time_based',
         'number_of_beds',
         'capacity',
         'status',
@@ -29,7 +28,6 @@ class Room extends Model
     {
         return [
             'base_price' => 'decimal:2',
-            'is_time_based' => 'boolean',
             'is_archived' => 'boolean',
         ];
     }
