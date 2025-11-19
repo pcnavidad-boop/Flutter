@@ -27,11 +27,13 @@
                         <th>Type</th>
                         <th>Price Type</th>
                         <th>Base Price</th>
+
                         <th>Beds</th>
                         <th>Capacity</th>
                         <th>Status</th>
                         <th>Archived</th>
                         <th>Description</th>
+                        <th>Archived?</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -59,15 +61,19 @@
                             @endif
                         </td>
 
+
                         <td>
                             @if($room->is_archived)
+
                                 <span class="badge bg-danger">Archived</span>
                             @else
                                 <span class="badge bg-success">Active</span>
                             @endif
                         </td>
 
+
                         <td>{{ Str::limit($room->description, 40) }}</td>
+
 
                         <td>
                             <!-- VIEW BUTTON -->
@@ -83,11 +89,29 @@
                                 class="btn btn-sm btn-outline-secondary editBtn"
                                 data-bs-toggle="modal"
                                 data-bs-target="#editRoomModal"
-                                data-room="{{ htmlspecialchars(json_encode($room), ENT_QUOTES, 'UTF-8') }}"
-                            >Edit</button>
+                                data-id="{{ $room->id }}"
+                                data-room_number="{{ $room->room_number }}"
+                                data-type="{{ $room->type }}"
+                                data-price_type="{{ $room->price_type }}"
+                                data-price="{{ $room->base_price }}"
+                                data-is_time_based="{{ $room->is_time_based }}"
+                                data-beds="{{ $room->number_of_beds }}"
+                                data-capacity="{{ $room->capacity }}"
+                                data-status="{{ $room->status }}"
+                                data-description="{{ $room->description }}">
+                                Edit
+                            </button>
+
                         </td>
+
                     </tr>
-                    @endforeach
+
+                    @empty
+                    <tr>
+                        <td colspan="12" class="text-center text-muted">No rooms found.</td>
+                    </tr>
+                    @endforelse
+
                 </tbody>
 
             </table>
@@ -101,6 +125,39 @@
 <x-modal.edit_room />
 <x-modal.view_room />
 
+
+{{-- JS to populate edit modal --}}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const editButtons = document.querySelectorAll('.editBtn');
+    const editForm = document.getElementById('editRoomForm');
+
+    editButtons.forEach(button => {
+        button.addEventListener('click', () => {
+
+            editForm.action = `/rooms/${button.dataset.id}`;
+
+            document.getElementById('edit_room_number').value = button.dataset.room_number ?? '';
+            document.getElementById('edit_type').value = button.dataset.type ?? '';
+            document.getElementById('edit_price_type').value = button.dataset.price_type ?? '';
+            document.getElementById('edit_base_price').value = button.dataset.price ?? '';
+            document.getElementById('edit_is_time_based').checked = (button.dataset.is_time_based == '1');
+            document.getElementById('edit_number_of_beds').value = button.dataset.beds ?? '';
+            document.getElementById('edit_capacity').value = button.dataset.capacity ?? '';
+            document.getElementById('edit_status').value = button.dataset.status ?? '';
+            document.getElementById('edit_description').value = button.dataset.description ?? '';
+        });
+    });
+
+    const editModalEl = document.getElementById('editRoomModal');
+    editModalEl.addEventListener('hidden.bs.modal', function () {
+        editForm.reset();
+    });
+});
+</script>
+
+<!-- jQuery + DataTables JS (CDN) -->
+
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
@@ -110,55 +167,11 @@ $(document).ready(function() {
     $('#rooms-table').DataTable({
         responsive: true,
         pageLength: 10,
-        ordering: true,
-        columnDefs: [{ orderable: false, targets: -1 }],
-        language: {
-            emptyTable: "No rooms found.",
-            zeroRecords: "No matching rooms found."
-        }
-    });
-});
-</script>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-
-    // VIEW MODAL LOGIC
-    document.querySelectorAll('.viewBtn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const room = JSON.parse(btn.dataset.room);
-
-            document.getElementById('view_room_number').innerText = "Room " + room.room_number;
-            document.getElementById('view_type').innerText = room.type;
-            document.getElementById('view_price').innerText = "₱" + parseFloat(room.base_price).toLocaleString();
-            document.getElementById('view_price_type').innerText = "(" + room.price_type.replace('_', ' ') + ")";
-            document.getElementById('view_description').innerText = room.description ?? '';
-            document.getElementById('view_status').innerText = room.status;
-            document.getElementById('view_capacity').innerText = room.capacity + " guests";
-
-            document.getElementById('view_image').src =
-                room.image ? "/storage/" + room.image : "/images/default-room.jpg";
-        });
-    });
-
-    // EDIT MODAL LOGIC
-    document.querySelectorAll('.editBtn').forEach(btn => {
-        btn.addEventListener('click', () => {
-
-            const room = JSON.parse(btn.dataset.room);
-            const form = document.getElementById('editRoomForm');
-            form.action = `/rooms/${room.id}`;
-
-            document.getElementById('edit_room_number').value = room.room_number;
-            document.getElementById('edit_type').value = room.type;
-            document.getElementById('edit_price_type').value = room.price_type;
-            document.getElementById('edit_base_price').value = room.base_price;
-            document.getElementById('edit_number_of_beds').value = room.number_of_beds ?? '';
-            document.getElementById('edit_capacity').value = room.capacity;
-            document.getElementById('edit_status').value = room.status;
-            document.getElementById('edit_description').value = room.description ?? '';
-            document.getElementById('edit_is_archived').value = room.is_archived ? 1 : 0;
-        });
+        lengthMenu: [ [10, 25, 50], [10, 25, 50] ],
+        columnDefs: [
+            { orderable: false, targets: -1 }
+        ]
     });
 
 });

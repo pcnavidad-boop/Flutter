@@ -17,6 +17,7 @@
 
                 <div class="mb-3">
                     <label>Room Type</label>
+
                     <select name="type" class="form-select" required>
                         @foreach(['Single','Double','Quad','Family','Suite','Penthouse','Function'] as $type)
                             <option value="{{ $type }}">{{ $type }}</option>
@@ -44,19 +45,11 @@
                 </div>
 
                 <div class="mb-3">
-                    <label>Capacity</label>
-                    <input type="number" name="capacity" class="form-control" required>
-                </div>
 
-                <div class="mb-3">
-                    <label>Status</label>
-                    <select name="status" class="form-select" required>
-                        @foreach(['Available','Occupied','Maintenance','Unavailable'] as $status)
-                            <option value="{{ $status }}">{{ $status }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
+                    <label>Room Capacity</label>
+                    <input type="number" name="capacity" step="1" class="form-control" >
+                </div>                
+                
                 <div class="mb-3">
                     <label>Description</label>
                     <textarea name="description" class="form-control" rows="3"></textarea>
