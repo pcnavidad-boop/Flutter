@@ -73,7 +73,7 @@ class RoomBookingController extends Controller
             ->with('success', 'Room booking created successfully.');
     }
 
-    // Update booking
+    // Update a booking
     public function update(Request $request, RoomBooking $booking)
     {
         $data = $request->validate([
@@ -105,7 +105,7 @@ class RoomBookingController extends Controller
         return redirect()->back()->with('success', 'Booking updated.');
     }
 
-    // Delete booking
+    // Delete a booking
     public function destroy(RoomBooking $booking)
     {
         $booking->delete();

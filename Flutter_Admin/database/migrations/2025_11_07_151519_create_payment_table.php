@@ -24,9 +24,14 @@ return new class extends Migration
             $table->enum('method', ['Cash', 'Card', 'Bank Transfer', 'E-Wallet'])->default('Cash');
             $table->enum('status', ['Pending', 'Completed', 'Failed', 'Refunded'])->default('Pending');
 
-            $table->timestamps();
-
+            // Indexes
             $table->index(['payable_id', 'payable_type']);
+            $table->index('user_id');
+            $table->index('method');
+            $table->index('status');
+            $table->index('date');
+
+            $table->timestamps();
         });
     }
 

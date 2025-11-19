@@ -55,10 +55,10 @@ class RoomBooking extends Model
         return $this->belongsTo(User::class);
     }
 
-    // Polymorphic payment
-    public function payment()
+    // Polymorphic payments (should be many)
+    public function payments()
     {
-        return $this->morphOne(Payment::class, 'payable');
+        return $this->morphMany(Payment::class, 'payable');
     }
 
     // Scopes

@@ -26,7 +26,8 @@ class ServiceBookingController extends Controller
         $services = Service::active()->available()->get();
         return view('service_booking.create', compact('services'));
     }
-
+ 
+    // Create a booking
     public function create(Request $request)
     {
         $data = $request->validate([
@@ -69,6 +70,7 @@ class ServiceBookingController extends Controller
             ->with('success', 'Service booking created.');
     }
 
+    // Update a booking
     public function update(Request $request, ServiceBooking $booking)
     {
         $data = $request->validate([
@@ -96,6 +98,7 @@ class ServiceBookingController extends Controller
         return back()->with('success', 'Service booking updated.');
     }
 
+    // Delete a booking
     public function destroy(ServiceBooking $booking)
     {
         $booking->delete();

@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('services', function (Blueprint $table) {
             $table->id();
 
-            // Descriptive Info
+            // Service Info
             $table->string('name')->unique();
             $table->text('description')->nullable();
             $table->integer('capacity')->nullable();
@@ -34,6 +34,9 @@ return new class extends Migration
 
             // Foreign Key 
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+
+            // URL Slug
+            $table->string('slug')->unique();
 
             $table->timestamps();
         });

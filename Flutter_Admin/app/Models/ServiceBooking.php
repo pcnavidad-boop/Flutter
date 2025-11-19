@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class ServiceBooking extends Model
 {
@@ -51,10 +51,10 @@ class ServiceBooking extends Model
         return $this->belongsTo(User::class);
     }
 
-    // Polymorphic payment
-    public function payment()
+    // Correct polymorphic relationship (many payments)
+    public function payments()
     {
-        return $this->morphOne(Payment::class, 'payable');
+        return $this->morphMany(Payment::class, 'payable');
     }
 
     // Scopes

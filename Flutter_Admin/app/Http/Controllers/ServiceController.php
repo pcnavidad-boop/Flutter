@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Service;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
 
 class ServiceController extends Controller
 {
@@ -15,7 +16,7 @@ class ServiceController extends Controller
         return view('service.index', compact('services'));
     }
 
-    // Create service
+    // Create a service
     public function create(Request $request)
     {
         $data = $request->validate([
@@ -35,22 +36,18 @@ class ServiceController extends Controller
         }
 
         $data['user_id'] = auth()->id();
+        $data['slug'] = Str::slug($data['name'] . '-' . uniqid());
 
         Service::create($data);
 
         return redirect()->route('service.index_page')->with('success', 'Service created successfully');
     }
 
-    // Update service
+    // Update a service
     public function update(Request $request, Service $service)
     {
         $data = $request->validate([
-            'name'        => [
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('services', 'name')->ignore($service->id),
-            ],
+            'name'        => ['required','string','max:255',Rule::unique('services','name')->ignore($service->id)],
             'description' => 'nullable|string|max:1000',
             'capacity'    => 'nullable|integer|min:1',
             'price_type'  => 'required|in:per_hour,per_service,per_person',
@@ -65,26 +62,27 @@ class ServiceController extends Controller
             $data['image'] = $request->file('image')->store('service_images', 'public');
         }
 
+        // Regenerate slug if name changes
+        if ($data['name'] !== $service->name) {
+            $data['slug'] = Str::slug($data['name'] . '-' . uniqid());
+        }
+
         $service->update($data);
 
         return redirect()->route('service.index_page')->with('success', 'Service updated successfully');
     }
 
-    // Archive service
+    // Archive a service
     public function archive(Request $request, Service $service)
     {
-        $data = $request->validate([
-            'is_archived' => 'required|boolean',
-        ]);
+        $request->validate(['is_archived' => 'required|boolean']);
 
-        $service->update([
-            'is_archived' => $data['is_archived'],
-        ]);
+        $service->update(['is_archived' => $request->is_archived]);
 
         return redirect()->route('service.index_page')->with('success', 'Service archived successfully');
     }
 
-    // Delete service
+    // Delete a service
     public function destroy(Service $service)
     {
         $service->delete();
