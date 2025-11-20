@@ -16,18 +16,17 @@ class RoomController extends Controller
         return view('room.index', compact('rooms'));
     }
 
-    // Create room
+    // Create a room
     public function create(Request $request)
     {
         $data = $request->validate([
             'name'           => 'required|string|max:255|unique:rooms,name',
             'room_number'    => 'required|string|max:255|unique:rooms,room_number',
-            'room_type'      => 'required|in:Single,Double,Quad,Family,Suite,Penthouse,Function',
+            'room_type'      => 'required|in:single,double,quad,family,suite,penthouse,function',
             'price_type'     => 'required|in:per_night,per_hour',
-            'base_price'     => 'required|numeric|min:0|max:99999999.99',
+            'base_price'     => 'required|numeric|min:0|max:999999.99',
             'number_of_beds' => 'nullable|integer|min:1',
             'capacity'       => 'required|integer|min:1',
-            'status'         => 'required|in:Available,Occupied,Maintenance,Unavailable',
             'description'    => 'nullable|string|max:1000',
             'image'          => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
@@ -44,20 +43,20 @@ class RoomController extends Controller
         return redirect()->route('room.index_page')->with('success', 'Room created successfully');
     }
 
-    // Update room
+    // Update a room
     public function update(Request $request, Room $room)
     {
         $data = $request->validate([
-            'name'           => ['required', 'string', 'max:255', Rule::unique('rooms', 'name')->ignore($room->id)],
-            'room_number'    => ['required', 'string', 'max:255', Rule::unique('rooms', 'room_number')->ignore($room->id)],
-            'room_type'      => 'required|in:Single,Double,Quad,Family,Suite,Penthouse,Function',
+            'name'           => 'required|string|max:255|unique:rooms,name',
+            'room_number'    => 'required|string|max:255|unique:rooms,room_number',
+            'room_type'      => 'required|in:single,double,quad,family,suite,penthouse,function',
             'price_type'     => 'required|in:per_night,per_hour',
-            'base_price'     => 'required|numeric|min:0|max:99999999.99',
+            'base_price'     => 'required|numeric|min:0|max:999999.99',
             'number_of_beds' => 'nullable|integer|min:1',
             'capacity'       => 'required|integer|min:1',
-            'status'         => 'required|in:Available,Occupied,Maintenance,Unavailable',
             'description'    => 'nullable|string|max:1000',
             'image'          => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'status'         => 'required|in:available,occupied,maintenance',
         ]);
 
         if ($request->hasFile('image')) {
@@ -74,7 +73,7 @@ class RoomController extends Controller
         return redirect()->route('room.index_page')->with('success', 'Room updated successfully');
     }
 
-    // Archive room
+    // Archive a room
     public function archive(Request $request, Room $room)
     {
         $request->validate(['is_archived' => 'required|boolean']);
@@ -84,7 +83,7 @@ class RoomController extends Controller
         return redirect()->route('room.index_page')->with('success', 'Room archived successfully');
     }
 
-    // Delete room
+    // Delete a room
     public function destroy(Room $room)
     {
         $room->delete();

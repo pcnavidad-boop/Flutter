@@ -14,29 +14,37 @@ return new class extends Migration
         Schema::create('services', function (Blueprint $table) {
             $table->id();
 
-            // Service Info
+            // Foreign Key 
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+
+            // Service Identification
             $table->string('name')->unique();
             $table->text('description')->nullable();
-            $table->integer('capacity')->nullable();
             $table->string('image')->nullable();
 
             // Pricing
             $table->enum('price_type', ['per_hour', 'per_service', 'per_person'])->default('per_hour');
             $table->decimal('base_price', 10, 2)->default(0);
 
+            // Capacity
+            $table->integer('capacity')->default(1);
+
             // Availability
-            $table->time('start_time')->nullable();
-            $table->time('end_time')->nullable();
-            $table->enum('status', ['Available','Occupied','Maintenance','Unavailable'])->default('Available');
+            $table->time('start_time');
+            $table->time('end_time');
+            $table->enum('status', ['available','occupied','maintenance'])->default('available');
             
             // Archive Status
             $table->boolean('is_archived')->default(false);
 
-            // Foreign Key 
-            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-
             // URL Slug
             $table->string('slug')->unique();
+
+            // Indexes
+            $table->index('status');
+            $table->index('price_type');
+            $table->index('is_archived');
+            $table->index('user_id');
 
             $table->timestamps();
         });

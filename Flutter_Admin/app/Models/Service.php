@@ -65,7 +65,7 @@ class Service extends Model
     // Scopes
     public function scopeAvailable($query)
     {
-        return $query->where('status', 'Available');
+        return $query->where('status', 'available');
     }
 
     public function scopeActive($query)

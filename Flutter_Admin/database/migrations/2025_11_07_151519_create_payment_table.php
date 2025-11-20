@@ -11,21 +11,20 @@ return new class extends Migration
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
 
-            // Polymorphic relation
-            $table->unsignedBigInteger('payable_id');
-            $table->string('payable_type');
-
-            // Admin Details
+            // Foreign Key
             $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('cascade');
 
+            // Polymorphic relationship (RoomBooking or ServiceBooking)
+            $table->morphs('payable'); 
+
             // Payment Details
+            $table->string('reference')->nullable()->unique();
             $table->decimal('amount', 10, 2);
             $table->date('date');
-            $table->enum('method', ['Cash', 'Card', 'Bank Transfer', 'E-Wallet'])->default('Cash');
-            $table->enum('status', ['Pending', 'Completed', 'Failed', 'Refunded'])->default('Pending');
+            $table->enum('method', ['api', 'cash', 'card', 'bank_transfer', 'e_wallet'])->default('cash');
+            $table->enum('channel', ['online','offline'])->default('offline');
+            $table->enum('status', ['completed', 'refunded'])->default('completed');
 
-            // Indexes
-            $table->index(['payable_id', 'payable_type']);
             $table->index('user_id');
             $table->index('method');
             $table->index('status');

@@ -14,10 +14,15 @@ return new class extends Migration
         Schema::create('rooms', function (Blueprint $table) {
             $table->id();
 
+            // Foreign Key
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+
             // Room Identification
             $table->string('name')->unique();
             $table->string('room_number')->unique();
-            $table->enum('room_type', ['Single','Double','Quad','Family','Suite','Penthouse','Function'])->default('Single');
+            $table->enum('room_type', ['single','double','quad','family','suite','penthouse','function'])->default('single');
+            $table->text('description')->nullable();
+            $table->string('image')->nullable();
 
             // Pricing
             $table->enum('price_type', ['per_night','per_hour'])->default('per_night');
@@ -28,17 +33,10 @@ return new class extends Migration
             $table->integer('capacity')->default(1);
 
             // Availability
-            $table->enum('status', ['Available','Occupied','Maintenance','Unavailable'])->default('Available');
-
-            // Descriptive Info
-            $table->text('description')->nullable();
-            $table->string('image')->nullable();
+            $table->enum('status', ['available','occupied','maintenance'])->default('available');
 
             // Archive Status
             $table->boolean('is_archived')->default(false);
-
-            // Foreign Key
-            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
 
             // URL Slug
             $table->string('slug')->unique();
