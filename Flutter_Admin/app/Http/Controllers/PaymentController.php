@@ -3,9 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Payment;
-use App\Models\RoomBooking;
-use App\Models\ServiceBooking;
 use Illuminate\Http\Request;
+use App\Services\PaymentService;
 
 class PaymentController extends Controller
 {
@@ -18,7 +17,7 @@ class PaymentController extends Controller
         return view('payment.index', compact('payments'));
     }
 
-    // Create a payment
+    // Create an offline payment (admin-side only)
     public function create(Request $request)
     {
         $data = $request->validate([
@@ -26,37 +25,46 @@ class PaymentController extends Controller
             'booking_id'   => 'required|integer',
             'amount'       => 'required|numeric|min:0',
             'date'         => 'required|date',
-            'method'       => 'required|in:Cash,Card,Bank Transfer,E-Wallet',
-            'status'       => 'required|in:Pending,Completed,Failed,Refunded',
+            'method'       => 'required|in:cash,card,bank_transfer,e_wallet',
+            'channel'      => 'required|in:offline',
+            'status'       => 'required|in:completed,refunded',
+            'reference'    => 'nullable|string|max:255',
         ]);
 
-        $data['user_id'] = auth()->id();
+        $data['user_id'] = auth()->id(); // admin performing offline payment
 
-        $payable = $data['booking_type'] === 'room'
-            ? RoomBooking::findOrFail($data['booking_id'])
-            : ServiceBooking::findOrFail($data['booking_id']);
+        // Identify booking
+        $booking = PaymentService::findBooking($data['booking_type'], $data['booking_id']);
 
-        $payment = $payable->payments()->create([
-            'user_id' => $data['user_id'],
-            'amount'  => $data['amount'],
-            'date'    => $data['date'],
-            'method'  => $data['method'],
-            'status'  => $data['status'],
+        // Create payment
+        $booking->payments()->create([
+            'user_id'   => $data['user_id'],
+            'reference' => $data['reference'],
+            'amount'    => $data['amount'],
+            'date'      => $data['date'],
+            'method'    => $data['method'],  // cash/card/bank/e_wallet
+            'channel'   => 'offline',
+            'status'    => $data['status'],
         ]);
 
-        // Update booking payment status
-        $payable->update([
-            'payment_status' => $data['status'] === 'Completed' ? 'Paid' : 'Unpaid',
-        ]);
+        // Recompute booking payment state
+        PaymentService::updateBookingPaymentStatus($booking);
 
-        return redirect()->route('payment.index_page')
-            ->with('success', 'Payment recorded successfully.');
+        return redirect()
+            ->route('payment.index_page')
+            ->with('success', 'Offline payment recorded and booking updated.');
     }
 
-    // Delete a payment
+    // Delete an offline payment
     public function destroy(Payment $payment)
     {
+        $booking = $payment->payable;
+
         $payment->delete();
-        return back()->with('success', 'Payment deleted.');
+
+        // Recompute booking payment status
+        PaymentService::updateBookingPaymentStatus($booking);
+
+        return back()->with('success', 'Payment deleted and booking updated.');
     }
 }

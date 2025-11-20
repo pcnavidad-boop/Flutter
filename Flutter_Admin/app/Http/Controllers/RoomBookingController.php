@@ -8,6 +8,7 @@ use App\Models\RoomBooking;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use App\Notifications\NewRoomBookingNotification;
+use Illuminate\Validation\Rule;
 
 class RoomBookingController extends Controller
 {
@@ -35,7 +36,7 @@ class RoomBookingController extends Controller
             // Guest Details
             'guest_name'       => 'required|string|max:255',
             'guest_email'      => 'required|email|max:255',
-            'guest_contact'    => 'nullable|string|max:255',
+            'guest_contact'    => 'nullable|string|max:11',
 
             // Booking Details
             'room_id'          => 'required|exists:rooms,id',
@@ -48,16 +49,16 @@ class RoomBookingController extends Controller
             'end_time'         => 'nullable|date_format:H:i|after_or_equal:start_time',
 
             'remarks'          => 'nullable|string|max:2000',
-            'type'             => 'required|in:Website,Walk-in,Phone,E-mail',
+            'type'             => ['required', Rule::in(['website','walk-in','phone','email'])],
             'booking_date'     => 'required|date',
 
-            'booking_status'   => 'required|in:Pending,Confirmed,Declined,Checked_In,Checked_Out,Cancelled',
-            'payment_status'   => 'required|in:Unpaid,Partially_Paid,Paid,Refunded',
+            'booking_status'   => 'confirmed',
+            'payment_status'   => 'required|in:downpayment,fully_paid',
         ]);
 
         $data['user_id'] = auth()->id();
 
-        // Create unique booking reference
+        // Generate unique reference
         $data['reference'] = 'RB-' . strtoupper(Str::random(8));
 
         // Save booking
@@ -80,7 +81,7 @@ class RoomBookingController extends Controller
             // Guest Details
             'guest_name'       => 'required|string|max:255',
             'guest_email'      => 'required|email|max:255',
-            'guest_contact'    => 'nullable|string|max:255',
+            'guest_contact'    => 'nullable|string|max:11',
 
             // Booking Details
             'room_id'          => 'required|exists:rooms,id',
@@ -93,11 +94,11 @@ class RoomBookingController extends Controller
             'end_time'         => 'nullable|date_format:H:i|after_or_equal:start_time',
 
             'remarks'          => 'nullable|string|max:2000',
-            'type'             => 'required|in:Website,Walk-in,Phone,E-mail',
+            'type'             => ['required', Rule::in(['website','walk-in','phone','email'])],
             'booking_date'     => 'required|date',
 
-            'booking_status'   => 'required|in:Pending,Confirmed,Declined,Checked_In,Checked_Out,Cancelled',
-            'payment_status'   => 'required|in:Unpaid,Partially_Paid,Paid,Refunded',
+            'booking_status'   => ['required', Rule::in(['confirmed','checked_in','checked_out','cancelled'])],
+            'payment_status'   => ['required', Rule::in(['downpayment','fully_paid','refunded'])],
         ]);
 
         $booking->update($data);
@@ -109,6 +110,6 @@ class RoomBookingController extends Controller
     public function destroy(RoomBooking $booking)
     {
         $booking->delete();
-        return back()->with('success', 'Booking deleted.');
+        return back()->with('success', 'Room booking deleted.');
     }
 }

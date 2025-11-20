@@ -13,9 +13,11 @@ class Payment extends Model
         'payable_id',
         'payable_type',
         'user_id',
+        'reference',
         'amount',
         'date',
         'method',
+        'channel',
         'status',
     ];
 
@@ -24,13 +26,12 @@ class Payment extends Model
         'date'   => 'date',
     ];
 
-    // Polymorphic Relationship
+    // Relationships
     public function payable()
     {
         return $this->morphTo();
     }
 
-    // User who recorded the payment
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
@@ -39,19 +40,19 @@ class Payment extends Model
     // Scopes
     public function scopeCompleted($query)
     {
-        return $query->where('status', 'Completed');
-    }
-
-    public function scopePending($query)
-    {
-        return $query->where('status', 'Pending');
+        return $query->where('status', 'completed');
     }
 
     public function scopeRefunded($query)
     {
-        return $query->where('status', 'Refunded');
+        return $query->where('status', 'refunded');
     }
 
+    public function scopeOnline($query)
+    {
+        return $query->where('channel', 'online');
+    }
+    
     public function scopeByMethod($query, $method)
     {
         return $query->where('method', $method);

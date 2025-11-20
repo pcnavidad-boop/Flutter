@@ -24,11 +24,10 @@ class ServiceController extends Controller
             'description' => 'nullable|string|max:1000',
             'capacity'    => 'nullable|integer|min:1',
             'price_type'  => 'required|in:per_hour,per_service,per_person',
-            'base_price'  => 'required|numeric|min:0|max:99999999.99',
+            'base_price'  => 'required|numeric|min:0|max:999999.99',
             'start_time'  => 'nullable|date_format:H:i',
             'end_time'    => 'nullable|date_format:H:i|after_or_equal:start_time',
             'image'       => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-            'status'      => 'required|in:Available,Occupied,Maintenance,Unavailable',
         ]);
 
         if ($request->hasFile('image')) {
@@ -51,11 +50,11 @@ class ServiceController extends Controller
             'description' => 'nullable|string|max:1000',
             'capacity'    => 'nullable|integer|min:1',
             'price_type'  => 'required|in:per_hour,per_service,per_person',
-            'base_price'  => 'required|numeric|min:0|max:99999999.99',
+            'base_price'  => 'required|numeric|min:0|max:999999.99',
             'start_time'  => 'nullable|date_format:H:i',
             'end_time'    => 'nullable|date_format:H:i|after_or_equal:start_time',
             'image'       => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-            'status'      => 'required|in:Available,Occupied,Maintenance,Unavailable',
+            'status'      => 'required|in:available,occupied,maintenance',
         ]);
 
         if ($request->hasFile('image')) {

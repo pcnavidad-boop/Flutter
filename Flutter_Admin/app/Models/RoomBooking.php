@@ -64,17 +64,27 @@ class RoomBooking extends Model
     // Scopes
     public function scopeConfirmed($query)
     {
-        return $query->where('booking_status', 'Confirmed');
+        return $query->where('booking_status', 'confirmed');
     }
 
-    public function scopeUnpaid($query)
+    public function scopeDownpayment($query)
     {
-        return $query->where('payment_status', 'Unpaid');
+        return $query->where('payment_status', 'downpayment');
     }
 
     public function scopeActive($query)
     {
-        return $query->whereNotIn('booking_status', ['Cancelled', 'Declined']);
+        return $query->whereNotIn('booking_status', ['checked_out', 'cancelled']);
+    }
+
+    public function totalPaymentsCompleted()
+    {
+        return $this->payments()->where('status', 'completed')->sum('amount');
+    }
+
+    public function totalPaymentsRefunded()
+    {
+        return $this->payments()->where('status', 'refunded')->sum('amount');
     }
 
     // Accessors
