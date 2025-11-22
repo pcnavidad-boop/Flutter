@@ -6,25 +6,36 @@ use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\RoomBookingController;
 use App\Http\Controllers\ServiceBookingController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\StripeCheckoutController;
 use Illuminate\Support\Facades\Route;
 
+// Homepage
 Route::get('/', function () {
     return view('welcome');
 });
 
+// Stripe return routes (public)
+Route::get('/payment/success', function () {
+    return "Payment successful!";
+});
+
+Route::get('/payment/cancel', function () {
+    return "Payment cancelled.";
+});
+// Stripe test UI
+Route::view('/test-checkout', 'test_checkout');
+
+// Public Stripe Checkout (guest-side)
+Route::post('/stripe/checkout', [StripeCheckoutController::class, 'create'])
+    ->name('stripe.checkout');
+
 // not auth middleware for dummy frontend
 Route::prefix('hotel')->group(function () {
-
     Route::get('/', fn() => view('customer.landing'))->name('hotel.landing');
-
     Route::get('/rooms', fn() => view('customer.rooms'))->name('hotel.rooms');
-
     Route::get('/services', fn() => view('customer.services'))->name('hotel.services');
-
     Route::get('/book-room', fn() => view('customer.booking-room'))->name('hotel.book.room');
-
     Route::get('/book-service', fn() => view('customer.booking-service'))->name('hotel.book.service');
-
 });
 
 // admin-side + auth routes
@@ -66,7 +77,7 @@ Route::middleware('auth')->group(function () {
     Route::put('/service-bookings/{serviceBooking}', [ServiceBookingController::class, 'update'])->name('service_booking.update_data');
     Route::delete('/service-bookings/{serviceBooking}', [ServiceBookingController::class, 'destroy'])->name('service_booking.delete_data');
 
-    // Payments (Polymorphic)
+    // Offline Payments (Polymorphic)
     Route::get('/payments', [PaymentController::class, 'index'])->name('payment.index_page');
     Route::post('/payments', [PaymentController::class, 'create'])->name('payment.store_data');
     Route::delete('/payments/{payment}', [PaymentController::class, 'destroy'])->name('payment.delete_data');
