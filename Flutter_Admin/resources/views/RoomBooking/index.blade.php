@@ -35,7 +35,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse ($bookings as $booking)
+                    @foreach ($bookings as $booking)
                     <tr>
                         <td>{{ $booking->id }}</td>
                         <td>{{ $booking->guest_name }}</td>
@@ -72,11 +72,7 @@
                         </td>
                         <td>{{ $booking->processedBy->name ?? 'N/A' }}</td>
                     </tr>
-                    @empty
-                    <tr>
-                        <td colspan="11" class="text-center text-muted">No bookings found.</td>
-                    </tr>
-                    @endforelse
+                    @endforeach
                 </tbody>
             </table>
         </div>
@@ -90,16 +86,19 @@
 
 <!-- DataTables initialization -->
 <script>
-$(document).ready(function() {
-    $('#bookings-table').DataTable({
-        responsive: true,
-        paging: true,
-        searching: true,
-        ordering: true,
-        pageLength: 10,
-        lengthMenu: [ [10, 25, 50], [10, 25, 50] ],
-    });
+$('#bookings-table').DataTable({
+    responsive: true,
+    paging: true,
+    searching: true,
+    ordering: true,
+    pageLength: 10,
+    lengthMenu: [ [10, 25, 50], [10, 25, 50] ],
+
+    language: {
+        emptyTable: "No bookings found."
+    }
 });
+
 </script>
 
 <x-modal.calendar_filter />
