@@ -21,11 +21,58 @@ class RoomBookingController extends Controller
         return view('RoomBooking.index', compact('bookings'));
     }
 
+    // calendar filter
+    public function checkAvailability(Request $request)
+    {
+        $request->validate([
+            'check_in_date' => 'required|date',
+            'check_out_date' => 'required|date|after_or_equal:check_in_date',
+            'number_of_guests' => 'required|integer|min:1',
+        ]);
+
+        $checkIn = $request->check_in_date;
+        $checkOut = $request->check_out_date;
+        $guests = $request->number_of_guests;
+
+        // Get rooms where guest count <= room capacity
+        $query = Room::where('capacity', '>=', $guests);
+
+        // Filter out rooms that are already booked during the selected dates
+        $query->whereDoesntHave('bookings', function ($q) use ($checkIn, $checkOut) {
+            $q->where(function ($q2) use ($checkIn, $checkOut) {
+                $q2->whereBetween('check_in_date', [$checkIn, $checkOut])
+                ->orWhereBetween('check_out_date', [$checkIn, $checkOut])
+                ->orWhere(function ($q3) use ($checkIn, $checkOut) {
+                        $q3->where('check_in_date', '<=', $checkIn)
+                        ->where('check_out_date', '>=', $checkOut);
+                });
+            });
+        });
+
+        $availableRooms = $query->get();
+
+        if ($availableRooms->count() == 0) {
+            return redirect()->back()->with('error', 'No rooms available for selected dates.');
+        }
+
+        // Store selected values in session for the next page
+        session([
+            'check_in_date' => $checkIn,
+            'check_out_date' => $checkOut,
+            'number_of_guests' => $guests
+        ]);
+
+        // Redirect to create booking page
+        return redirect()->route('room_booking.create')
+            ->with('success', 'Rooms available! Please complete the booking form.');
+    }
+
+
     // Show create page
     public function viewCreatePage()
     {
         $rooms = Room::active()->available()->get();
-        return view('room_booking.create', compact('rooms'));
+        return view('RoomBooking.showCreate', compact('rooms'));
     }
 
     // Create a booking

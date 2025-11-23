@@ -19,6 +19,11 @@
                     <i class="bi bi-door-open me-2"></i> Rooms
                 </a>
             </li>
+            <li>
+                <a href="{{ route('room_booking.index_page') }}" class="flex items-center p-2 text-gray-900 rounded-lg hover:bg-gray-100">
+                    <i class="bi bi-door-open me-2"></i> Room Bookings
+                </a>
+            </li>
         </ul>
     </div>
 </aside>

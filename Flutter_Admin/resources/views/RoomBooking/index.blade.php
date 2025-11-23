@@ -11,9 +11,9 @@
 <div class="container mt-5">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h3>Room Bookings</h3>
-        <a href="{{ route('room_booking.create')}}" class="btn btn-primary">
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#calendarFilterModal">
             + Add Booking
-        </a>
+        </button>
     </div>
 
     <div class="card">
@@ -101,5 +101,17 @@ $(document).ready(function() {
     });
 });
 </script>
+
+<x-modal.calendar_filter />
+
+
+@if(session('error'))
+<script>
+    var myModal = new bootstrap.Modal(document.getElementById('calendarFilterModal'));
+    myModal.show();
+</script>
+@endif
+
+
 
 @endsection

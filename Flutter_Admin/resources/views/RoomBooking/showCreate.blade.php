@@ -11,7 +11,7 @@
 <div class="container mt-5">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h3>Add New Booking</h3>
-        <a href="{{ route('roombookings.index_page') }}" class="btn btn-secondary">
+        <a href="{{ route('room_booking.index_page') }}" class="btn btn-secondary">
             ← Back to Bookings
         </a>
     </div>
@@ -32,7 +32,7 @@
                 </div>
             @endif
 
-            <form action="{{ route('roombookings.create') }}" method="POST">
+            <form action="{{ route('room_booking.create') }}" method="POST">
                 @csrf
 
                 <div class="row">

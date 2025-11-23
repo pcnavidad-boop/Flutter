@@ -12,7 +12,7 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-// not auth middleware for dummy frontend
+// no auth middleware for customer-side frontend
 Route::prefix('hotel')->group(function () {
 
     Route::get('/', fn() => view('customer.landing'))->name('hotel.landing');
@@ -55,6 +55,7 @@ Route::middleware('auth')->group(function () {
     // Room Bookings
     Route::get('/room-bookings/create', [RoomBookingController::class, 'viewCreatePage'])->name('room_booking.create');
     Route::get('/room-bookings', [RoomBookingController::class, 'index'])->name('room_booking.index_page');
+    Route::post('/room-bookings/check-availability', [RoomBookingController:: class, 'checkAvailability'])->name('room_booking.check_availability');
     Route::post('/room-bookings', [RoomBookingController::class, 'create'])->name('room_booking.store_data');
     Route::put('/room-bookings/{roomBooking}', [RoomBookingController::class, 'update'])->name('room_booking.update_data');
     Route::delete('/room-bookings/{roomBooking}', [RoomBookingController::class, 'destroy'])->name('room_booking.delete_data');
