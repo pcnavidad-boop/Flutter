@@ -59,7 +59,7 @@
                             <option value="">-- Select Room --</option>
                             @foreach ($rooms as $room)
                                 <option value="{{ $room->id }}" {{ old('room_id') == $room->id ? 'selected' : '' }}>
-                                    {{ $room->room_number ?? $room->room_name }}
+                                    {{ $room->room_number }} — {{ $room->type }} (Max: {{ $room->capacity }} guests)
                                 </option>
                             @endforeach
                         </select>
@@ -67,27 +67,38 @@
 
                     <div class="col-md-6 mb-3">
                         <label for="booking_date" class="form-label fw-semibold">Booking Date</label>
-                        <input type="date" name="booking_date" id="booking_date" class="form-control" value="{{ old('booking_date') }}" required>
+                        <input type="date" 
+                            name="booking_date" 
+                            id="booking_date" 
+                            class="form-control"
+                            value="{{ old('booking_date', now()->toDateString()) }}" 
+                            required>
                     </div>
                 </div>
 
                 <hr>
 
                 <div class="row">
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-6 mb-3">
                         <label for="check_in_date" class="form-label fw-semibold">Check-In Date</label>
-                        <input type="date" name="check_in_date" id="check_in_date" class="form-control" value="{{ old('check_in_date') }}">
+                        <input type="date" 
+                            name="check_in_date" 
+                            id="check_in_date" 
+                            class="form-control"
+                            value="{{ old('check_in_date', session('check_in_date')) }}">
+
                     </div>
 
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-6 mb-3">
                         <label for="check_out_date" class="form-label fw-semibold">Check-Out Date</label>
-                        <input type="date" name="check_out_date" id="check_out_date" class="form-control" value="{{ old('check_out_date') }}">
+                        <input type="date" 
+                            name="check_out_date" 
+                            id="check_out_date" 
+                            class="form-control"
+                            value="{{ old('check_out_date', session('check_out_date')) }}">
+
                     </div>
 
-                    <div class="col-md-4 mb-3">
-                        <label for="event_date" class="form-label fw-semibold">Event Date</label>
-                        <input type="date" name="event_date" id="event_date" class="form-control" value="{{ old('event_date') }}">
-                    </div>
                 </div>
 
                 <div class="row">

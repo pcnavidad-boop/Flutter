@@ -64,14 +64,27 @@ class RoomBookingController extends Controller
 
         // Redirect to create booking page
         return redirect()->route('room_booking.create')
-            ->with('success', 'Rooms available! Please complete the booking form.');
+        ->with([
+            'success' => 'Rooms available! Please complete the booking form.',
+            'availableRooms' => $availableRooms
+        ]);
     }
 
 
     // Show create page
     public function viewCreatePage()
     {
-        $rooms = Room::active()->available()->get();
+        // Check if filtered rooms were passed from checkAvailability()
+        $availableRooms = session('availableRooms');
+
+        if ($availableRooms) {
+            // Use the filtered available rooms
+            $rooms = $availableRooms;
+        } else {
+            // Fallback: default to active + available rooms if accessed directly
+            $rooms = Room::active()->available()->get();
+        }
+
         return view('RoomBooking.showCreate', compact('rooms'));
     }
 
@@ -90,7 +103,6 @@ class RoomBookingController extends Controller
             'number_of_guests' => 'required|integer|min:1',
             'check_in_date'    => 'nullable|date',
             'check_out_date'   => 'nullable|date|after_or_equal:check_in_date',
-            'event_date'       => 'nullable|date',
             'start_time'       => 'nullable|date_format:H:i',
             'end_time'         => 'nullable|date_format:H:i|after_or_equal:start_time',
 
