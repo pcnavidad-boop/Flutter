@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Str;
 
 class Payment extends Model
 {
@@ -25,6 +26,17 @@ class Payment extends Model
         'amount' => 'decimal:2',
         'date'   => 'date',
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($payment) {
+            if (!$payment->reference) {
+                $payment->reference = 'OFF-' . strtoupper(Str::random(10));
+            }
+        });
+    }
 
     // Relationships
     public function payable()

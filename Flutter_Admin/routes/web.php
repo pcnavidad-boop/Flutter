@@ -14,22 +14,19 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-// Stripe return routes (public)
-Route::get('/payment/success', function () {
-    return "Payment successful!";
-});
+// Stripe return routes
+Route::get('/payment/success', fn() => "Payment successful!");
+Route::get('/payment/cancel', fn() => "Payment cancelled.");
 
-Route::get('/payment/cancel', function () {
-    return "Payment cancelled.";
-});
 // Stripe test UI
 Route::view('/test-checkout', 'test_checkout');
 
-// Public Stripe Checkout (guest-side)
-Route::post('/stripe/checkout', [StripeCheckoutController::class, 'create'])
-    ->name('stripe.checkout');
+// Guest Payment Routes
+Route::get('/hotel/pay/downpayment/{reference}', [StripeCheckoutController::class, 'payDownpayment'])->name('guest.pay.downpayment');
+Route::get('/hotel/pay/full/{reference}',        [StripeCheckoutController::class, 'payFull'])->name('guest.pay.full');
+Route::get('/hotel/pay/remaining/{reference}',   [StripeCheckoutController::class, 'payRemaining'])->name('guest.pay.remaining');
 
-// not auth middleware for dummy frontend
+// Public Guest Pages
 Route::prefix('hotel')->group(function () {
     Route::get('/', fn() => view('customer.landing'))->name('hotel.landing');
     Route::get('/rooms', fn() => view('customer.rooms'))->name('hotel.rooms');
@@ -38,11 +35,10 @@ Route::prefix('hotel')->group(function () {
     Route::get('/book-service', fn() => view('customer.booking-service'))->name('hotel.book.service');
 });
 
-// admin-side + auth routes
-
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+// Admin Routes
+Route::get('/dashboard', fn() => view('dashboard'))
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
 
 Route::middleware('auth')->group(function () {
 
@@ -77,7 +73,7 @@ Route::middleware('auth')->group(function () {
     Route::put('/service-bookings/{serviceBooking}', [ServiceBookingController::class, 'update'])->name('service_booking.update_data');
     Route::delete('/service-bookings/{serviceBooking}', [ServiceBookingController::class, 'destroy'])->name('service_booking.delete_data');
 
-    // Offline Payments (Polymorphic)
+    // Offline Payments
     Route::get('/payments', [PaymentController::class, 'index'])->name('payment.index_page');
     Route::post('/payments', [PaymentController::class, 'create'])->name('payment.store_data');
     Route::delete('/payments/{payment}', [PaymentController::class, 'destroy'])->name('payment.delete_data');

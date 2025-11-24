@@ -33,7 +33,7 @@ class NewServiceBookingNotification extends Notification
             ->line('Service: ' . optional($this->booking->service)->name)
             ->line('Appointment Date: ' . optional($this->booking->appointment_date)->format('M d, Y'))
             ->line('Time: ' . $this->formatTimeRange())
-            ->action('View Booking', url('/service-bookings/' . $this->booking->id))
+            ->action('View Booking', url('/admin/service-bookings?reference=' . $this->booking->reference))
             ->line('Please check the booking as soon as possible.');
     }
 

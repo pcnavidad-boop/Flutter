@@ -25,15 +25,13 @@ class Service extends Model
         'slug',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'base_price'   => 'decimal:2',
-            'is_archived'  => 'boolean',
-        ];
-    }
+    protected $casts = [
+        'base_price'  => 'decimal:2',
+        'is_archived' => 'boolean',
+        'start_time'  => 'datetime:H:i',
+        'end_time'    => 'datetime:H:i',
+    ];
 
-    // Auto slug
     protected static function boot()
     {
         parent::boot();
@@ -45,7 +43,6 @@ class Service extends Model
         });
     }
 
-    // Use slug in route binding
     public function getRouteKeyName()
     {
         return 'slug';

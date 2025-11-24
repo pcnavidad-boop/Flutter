@@ -26,15 +26,11 @@ class Room extends Model
         'slug',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'base_price'   => 'decimal:2',
-            'is_archived'  => 'boolean',
-        ];
-    }
+    protected $casts = [
+        'base_price'  => 'decimal:2',
+        'is_archived' => 'boolean',
+    ];
 
-    // Auto-slug
     protected static function boot()
     {
         parent::boot();
@@ -46,13 +42,11 @@ class Room extends Model
         });
     }
 
-    // Route by slug instead of ID
     public function getRouteKeyName()
     {
         return 'slug';
     }
 
-    // Relationships
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
@@ -63,7 +57,6 @@ class Room extends Model
         return $this->hasMany(RoomBooking::class, 'room_id');
     }
 
-    // Scopes
     public function scopeAvailable($query)
     {
         return $query->where('status', 'available');
@@ -74,7 +67,6 @@ class Room extends Model
         return $query->where('is_archived', false);
     }
 
-    // Accessor
     public function getFormattedPriceAttribute()
     {
         return number_format($this->base_price, 2);

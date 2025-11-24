@@ -4,10 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Str;
+use Illuminate\Notifications\Notifiable;
 
 class ServiceBooking extends Model
 {
-    use HasFactory;
+    use HasFactory, Notifiable;
 
     protected $fillable = [
         'guest_name',
@@ -29,15 +31,23 @@ class ServiceBooking extends Model
         'status_change_reason',
     ];
 
-    protected function casts(): array
+    protected $casts = [
+        'total_price'      => 'decimal:2',
+        'appointment_date' => 'date',
+        'booking_date'     => 'date',
+        'start_time'       => 'datetime:H:i',
+        'end_time'         => 'datetime:H:i',
+    ];
+
+    protected static function boot()
     {
-        return [
-            'total_price'      => 'decimal:2',
-            'appointment_date' => 'date',
-            'booking_date'     => 'date',
-            'start_time'       => 'time',
-            'end_time'         => 'time',
-        ];
+        parent::boot();
+
+        static::creating(function ($booking) {
+            if (!$booking->reference) {
+                $booking->reference = 'SB-' . strtoupper(Str::random(8));
+            }
+        });
     }
 
     // Relationships
@@ -51,7 +61,6 @@ class ServiceBooking extends Model
         return $this->belongsTo(User::class);
     }
 
-    // Polymorphic payments (should be many)
     public function payments()
     {
         return $this->morphMany(Payment::class, 'payable');
@@ -102,5 +111,21 @@ class ServiceBooking extends Model
         }
 
         return $date;
+    }
+
+    public function getCalculatedTotalAttribute()
+    {
+        return \App\Services\BookingCalculator::computeTotal($this);
+    }
+
+    public function getRemainingBalanceAttribute()
+    {
+        return \App\Services\BookingCalculator::remainingBalance($this);
+    }
+
+    // Notification routing for mail
+    public function routeNotificationForMail(): string
+    {
+        return $this->guest_email;
     }
 }

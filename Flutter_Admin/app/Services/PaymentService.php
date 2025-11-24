@@ -7,55 +7,57 @@ use App\Models\ServiceBooking;
 
 class PaymentService
 {
-    // Recalculate booking payment status based on all payments.
+    /**
+     * Recalculate the booking's payment status
+     * using the new centralized BookingCalculator engine.
+     */
     public static function updateBookingPaymentStatus($booking): void
     {
-        $completed = $booking->totalPaymentsCompleted();
-        $refunded  = $booking->totalPaymentsRefunded();
-        $totalPrice = $booking->total_price ?? 0;
+        $total = BookingCalculator::computeTotal($booking);
+        $paid  = (float) $booking->totalPaymentsCompleted();
+        $refunded = (float) $booking->totalPaymentsRefunded();
 
-        // Case 1 — fully refunded
-        if ($completed == 0 && $refunded > 0) {
+        // Case 1 — Fully refunded
+        if ($paid == 0 && $refunded > 0) {
             $booking->payment_status = 'refunded';
-            $booking->booking_status = 'cancelled'; // optional but logical
+            $booking->booking_status = 'cancelled'; // logical default
             $booking->save();
             return;
         }
 
-        // Case 2 — fully paid
-        if ($completed >= $totalPrice && $totalPrice > 0) {
+        // Case 2 — Fully paid
+        if ($paid >= $total && $total > 0) {
             $booking->payment_status = 'fully_paid';
             $booking->save();
             return;
         }
 
-        // Case 3 — partial / downpayment
-        if ($completed > 0) {
+        // Case 3 — Partial payment
+        if ($paid > 0) {
             $booking->payment_status = 'downpayment';
             $booking->save();
             return;
         }
 
-        // Case 4 — no payments at all
+        // Case 4 — No payments
         $booking->payment_status = 'downpayment';
         $booking->save();
     }
 
     /**
-     * Determine the required downpayment amount.
-     * 
-     * Example: 30% downpayment rule (you can adjust this).
+     * Downpayment rule (editable)
+     * Example: 30%
      */
     public static function requiredDownpayment($booking): float
     {
-        $totalPrice = $booking->total_price ?? 0;
-        $percentage = 0.30; // 30% downpayment requirement
+        $total = BookingCalculator::computeTotal($booking);
+        $percentage = 0.30;
 
-        return round($totalPrice * $percentage, 2);
+        return round($total * $percentage, 2);
     }
 
     /**
-     * Guest-side: Validate if API payment meets minimum downpayment requirement.
+     * Check if Stripe payment meets minimum downpayment.
      */
     public static function paymentMeetsDownpayment($booking, float $amount): bool
     {
@@ -63,7 +65,7 @@ class PaymentService
     }
 
     /**
-     * Helper: Identify the correct booking model for polymorphic operations.
+     * Find booking via ID (admin-side use)
      */
     public static function findBooking(string $type, int $id)
     {
@@ -72,5 +74,25 @@ class PaymentService
             'service' => ServiceBooking::findOrFail($id),
             default   => null,
         };
+    }
+
+    /**
+     * Find booking via reference (Stripe-side use)
+     */
+    public static function findBookingByReference(string $type, string $reference)
+    {
+        return match ($type) {
+            'room'    => RoomBooking::where('reference', $reference)->first(),
+            'service' => ServiceBooking::where('reference', $reference)->first(),
+            default   => null,
+        };
+    }
+
+    /**
+     * Get remaining balance using the new BookingCalculator logic.
+     */
+    public static function remainingBalance($booking): float
+    {
+        return BookingCalculator::remainingBalance($booking);
     }
 }

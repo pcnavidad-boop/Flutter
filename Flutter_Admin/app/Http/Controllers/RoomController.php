@@ -47,8 +47,8 @@ class RoomController extends Controller
     public function update(Request $request, Room $room)
     {
         $data = $request->validate([
-            'name'           => 'required|string|max:255|unique:rooms,name',
-            'room_number'    => 'required|string|max:255|unique:rooms,room_number',
+            'name'           => ['required','string','max:255',Rule::unique('rooms','name')->ignore($room->id)],
+            'room_number'    => ['required','string','max:255',Rule::unique('rooms','room_number')->ignore($room->id)],
             'room_type'      => 'required|in:single,double,quad,family,suite,penthouse,function',
             'price_type'     => 'required|in:per_night,per_hour',
             'base_price'     => 'required|numeric|min:0|max:999999.99',

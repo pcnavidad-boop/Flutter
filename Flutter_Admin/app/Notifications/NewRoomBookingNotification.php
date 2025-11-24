@@ -33,7 +33,7 @@ class NewRoomBookingNotification extends Notification
             ->line('Room: ' . optional($this->booking->room)->name) 
             ->line('Check-in Date: ' . optional($this->booking->check_in_date)->format('M d, Y'))
             ->line('Check-out Date: ' . optional($this->booking->check_out_date)->format('M d, Y'))
-            ->action('View Booking', url('/room-bookings/' . $this->booking->id))
+            ->action('View Booking', url('/admin/room-bookings?reference=' . $this->booking->reference))
             ->line('Thank you for using the system.');
     }
 

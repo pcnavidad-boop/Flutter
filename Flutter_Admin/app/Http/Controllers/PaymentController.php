@@ -17,54 +17,55 @@ class PaymentController extends Controller
         return view('payment.index', compact('payments'));
     }
 
-    // Create an offline payment (admin-side only)
+    // Create an offline payment (admin-side)
     public function create(Request $request)
     {
         $data = $request->validate([
-            'booking_type' => 'required|in:room,service',
-            'booking_id'   => 'required|integer',
-            'amount'       => 'required|numeric|min:0',
-            'date'         => 'required|date',
-            'method'       => 'required|in:cash,card,bank_transfer,e_wallet',
-            'channel'      => 'required|in:offline',
-            'status'       => 'required|in:completed,refunded',
-            'reference'    => 'nullable|string|max:255',
+            'booking_type'      => 'required|in:room,service',
+            'booking_reference' => 'required|string',
+            'amount'            => 'required|numeric|min:0.01',
+            'date'              => 'required|date',
+            'method'            => 'required|in:cash,card,bank_transfer,e_wallet',
+            'channel'           => 'required|in:offline',
+            'status'            => 'required|in:completed,refunded',
+            'reference'         => 'nullable|string|max:255',
         ]);
 
-        $data['user_id'] = auth()->id(); // admin performing offline payment
+        $data['user_id'] = auth()->id();
 
-        // Identify booking
-        $booking = PaymentService::findBooking($data['booking_type'], $data['booking_id']);
+        // Find booking by reference
+        $booking = PaymentService::findBookingByReference($data['booking_type'], $data['booking_reference']);
 
-        // Create payment
+        if (!$booking) {
+            return back()->withErrors(['booking_reference' => 'Booking not found.']);
+        }
+
+        // Compute remaining balance
+        $remaining = PaymentService::remainingBalance($booking);
+
+        // Prevent overpayment
+        if ($data['amount'] > $remaining) {
+            return back()->withErrors([
+                'amount' => "This payment exceeds the remaining balance of ₱" . number_format($remaining, 2)
+            ]);
+        }
+
+        // Create offline payment
         $booking->payments()->create([
             'user_id'   => $data['user_id'],
             'reference' => $data['reference'],
             'amount'    => $data['amount'],
             'date'      => $data['date'],
-            'method'    => $data['method'],  // cash/card/bank/e_wallet
+            'method'    => $data['method'],
             'channel'   => 'offline',
             'status'    => $data['status'],
         ]);
 
-        // Recompute booking payment state
+        // Recalculate booking payment state
         PaymentService::updateBookingPaymentStatus($booking);
 
         return redirect()
             ->route('payment.index_page')
             ->with('success', 'Offline payment recorded and booking updated.');
-    }
-
-    // Delete an offline payment
-    public function destroy(Payment $payment)
-    {
-        $booking = $payment->payable;
-
-        $payment->delete();
-
-        // Recompute booking payment status
-        PaymentService::updateBookingPaymentStatus($booking);
-
-        return back()->with('success', 'Payment deleted and booking updated.');
     }
 }
