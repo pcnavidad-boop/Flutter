@@ -138,8 +138,6 @@
     </div>
 </div>
 
-<!-- nasuko ko -->
-
 
 <!-- MODALS -->
 <x-modal.calendar_filter />
@@ -220,10 +218,6 @@ document.addEventListener('DOMContentLoaded', function() {
             modal.show();
         }
     });
-
-
-        
-
 });
 
 

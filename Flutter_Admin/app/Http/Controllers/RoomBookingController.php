@@ -156,6 +156,29 @@ class RoomBookingController extends Controller
         ]);
         
 
+        $roomId = $booking->room_id; // existing room
+
+        $start = $data['check_in_date'];
+        $end   = $data['check_out_date'];
+
+        $overlap = RoomBooking::where('room_id', $roomId)
+            ->where('id', '!=', $booking->id) // ignore current booking
+            ->where(function($query) use ($start, $end) {
+                $query->whereBetween('check_in_date', [$start, $end])
+                    ->orWhereBetween('check_out_date', [$start, $end])
+                    ->orWhere(function($q) use ($start, $end) {
+                        $q->where('check_in_date', '<=', $start)
+                            ->where('check_out_date', '>=', $end);
+                    });
+            })
+            ->exists();
+
+        if ($overlap) {
+            return redirect()->back()->with('error', 'This room is already booked for the selected dates.');
+        }   
+
+
+
         $booking->update($data);
 
 

@@ -77,9 +77,18 @@
                             <!-- VIEW BUTTON -->
                             <button 
                                 class="btn btn-sm btn-outline-primary viewBtn"
-                                data-bs-toggle="modal"
-                                data-bs-target="#viewRoomModal"
-                                data-room="{{ htmlspecialchars(json_encode($room), ENT_QUOTES, 'UTF-8') }}"
+                                
+                                data-room-number="{{ $room->room_number }}"
+                                data-type="{{ $room->type }}"
+                                data-price-type="{{ $room->price_type }}"
+                                data-price="{{ $room->base_price }}"
+                                data-is-time-based="{{ $room->is_time_based }}"
+                                data-beds="{{ $room->number_of_beds }}"
+                                data-capacity="{{ $room->capacity }}"
+                                data-status="{{ $room->status }}"
+                                data-description="{{ $room->description }}"
+
+
                             >View</button>
 
                             <!-- EDIT BUTTON -->
@@ -89,11 +98,11 @@
                                 data-bs-target="#editRoomModal"
 
                                 data-id="{{ $room->id }}"
-                                data-room_number="{{ $room->room_number }}"
+                                data-room-number="{{ $room->room_number }}"
                                 data-type="{{ $room->type }}"
-                                data-price_type="{{ $room->price_type }}"
+                                data-price-type="{{ $room->price_type }}"
                                 data-price="{{ $room->base_price }}"
-                                data-is_time_based="{{ $room->is_time_based }}"
+                                data-is-time-based="{{ $room->is_time_based }}"
                                 data-beds="{{ $room->number_of_beds }}"
                                 data-capacity="{{ $room->capacity }}"
                                 data-status="{{ $room->status }}"
@@ -126,58 +135,56 @@
 {{-- JS to populate edit modal --}}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const editButtons = document.querySelectorAll('.editBtn');
-    const editForm = document.getElementById('editRoomForm');
 
-    editButtons.forEach(button => {
-        button.addEventListener('click', () => {
+    document.addEventListener('click', function (e) {
+        if (e.target.classList.contains('editBtn')) {
 
-            editForm.action = `/rooms/${button.dataset.id}`;
+            const button = e.target;
+            const editForm = document.getElementById('editRoomForm');
 
-            document.getElementById('edit_room_number').value = button.dataset.room_number ?? '';
-            document.getElementById('edit_type').value = button.dataset.type ?? '';
-            document.getElementById('edit_price_type').value = button.dataset.price_type ?? '';
-            document.getElementById('edit_base_price').value = button.dataset.price ?? '';
-            document.getElementById('edit_is_time_based').checked = (button.dataset.is_time_based == '1');
-            document.getElementById('edit_number_of_beds').value = button.dataset.beds ?? '';
-            document.getElementById('edit_capacity').value = button.dataset.capacity ?? '';
-            document.getElementById('edit_status').value = button.dataset.status ?? '';
-            document.getElementById('edit_description').value = button.dataset.description ?? '';
-        });
+            const id = button.dataset.id;
+            editForm.action = `/rooms/${id}`;
+
+            document.getElementById('edit_room_number').value   = button.dataset.roomNumber;
+            document.getElementById('edit_type').value          = button.dataset.type;
+            document.getElementById('edit_price_type').value    = button.dataset.priceType;
+            document.getElementById('edit_base_price').value    = button.dataset.price ?? '';
+            document.getElementById('edit_is_time_based').checked = (button.dataset.isTimeBased == '1');
+            document.getElementById('edit_number_of_beds').value = button.dataset.beds;
+            document.getElementById('edit_capacity').value      = button.dataset.capacity;
+            document.getElementById('edit_status').value        = button.dataset.status;
+            document.getElementById('edit_description').value   = button.dataset.description;
+
+
+            const modal = new bootstrap.Modal(document.getElementById('editRoomModal'));
+            modal.show();
+        }
+
     });
 
-    const editModalEl = document.getElementById('editRoomModal');
-    editModalEl.addEventListener('hidden.bs.modal', function () {
-        editForm.reset();
-    });
 });
 </script>
 
 {{-- JS to populate view modal --}}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const viewButton = document.querySelectorAll('.viewBtn');
-    const editForm = document.getElementById('viewModal');
+document.addEventListener('click', function (e) {
+    if (e.target.classList.contains('viewBtn')) {
 
-    viewButton.forEach(button => {
-        button.addEventListener('click', () => {
-
-            editForm.action = `/rooms/${button.dataset.id}`;
+        const button = e.target;
 
             
-            document.getElementById('view_type').value = button.dataset.type ?? 'no type';
-            document.getElementById('edit_price_type').value = button.dataset.price_type ?? '';
-            document.getElementById('edit_base_price').value = button.dataset.price ?? '';
-            document.getElementById('edit_is_time_based').checked = (button.dataset.is_time_based == '1');
-            document.getElementById('edit_number_of_beds').value = button.dataset.beds ?? '';
-            document.getElementById('edit_capacity').value = button.dataset.capacity ?? '';
-            document.getElementById('edit_status').value = button.dataset.status ?? '';
-            document.getElementById('edit_description').value = button.dataset.description ?? '';
-        });
-    });
-
-
-
+        document.getElementById('view_type').innerText = button.dataset.type;
+        document.getElementById('view_price_type').innerText = button.dataset.priceType;
+        document.getElementById('view_base_price').innerText = button.dataset.price;
+        document.getElementById('view_is_time_based').innerText = button.dataset.isTimeBased;
+        document.getElementById('view_number_of_beds').innerText = button.dataset.beds;
+        document.getElementById('view_capacity').innerText = button.dataset.capacity;
+        document.getElementById('view_status').innerText = button.dataset.status;
+        document.getElementById('view_description').innerText = button.dataset.description;
+    
+        const modal = new bootstrap.Modal(document.getElementById('viewRoomModal'));
+        modal.show();
+    }
 });
 </script>
 

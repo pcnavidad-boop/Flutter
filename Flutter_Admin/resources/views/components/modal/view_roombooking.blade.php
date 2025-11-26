@@ -1,4 +1,4 @@
-<!-- VIEW BOOKING MODAL -->
+
 <div class="modal fade" id="viewRoomBookingModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
