@@ -57,8 +57,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/room-bookings', [RoomBookingController::class, 'index'])->name('room_booking.index_page');
     Route::post('/room-bookings/check-availability', [RoomBookingController:: class, 'checkAvailability'])->name('room_booking.check_availability');
     Route::post('/room-bookings', [RoomBookingController::class, 'create'])->name('room_booking.store_data');
-    Route::put('/room-bookings/{roomBooking}', [RoomBookingController::class, 'update'])->name('room_booking.update_data');
-    Route::delete('/room-bookings/{roomBooking}', [RoomBookingController::class, 'destroy'])->name('room_booking.delete_data');
+    Route::put('/room-bookings/{booking}', [RoomBookingController::class, 'update'])->name('room_booking.update_data');
+    Route::delete('/room-bookings/{booking}', [RoomBookingController::class, 'destroy'])->name('room_booking.delete_data');
 
     // Service Bookings
     Route::get('/service-bookings/create', [ServiceBookingController::class, 'viewCreatePage'])->name('service_booking.create');

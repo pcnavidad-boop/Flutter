@@ -38,8 +38,6 @@ class RoomBooking extends Model
             'check_in_date'  => 'date',
             'check_out_date' => 'date',
             'event_date'     => 'date',
-            'start_time'     => 'time',
-            'end_time'       => 'time',
             'booking_date'   => 'date',
         ];
     }

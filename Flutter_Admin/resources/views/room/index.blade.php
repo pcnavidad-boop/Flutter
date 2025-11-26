@@ -2,8 +2,8 @@
 
 @section('content')
 
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css">
 
 <x-alert_message></x-alert_message>
 
@@ -87,6 +87,7 @@
                                 class="btn btn-sm btn-outline-secondary editBtn"
                                 data-bs-toggle="modal"
                                 data-bs-target="#editRoomModal"
+
                                 data-id="{{ $room->id }}"
                                 data-room_number="{{ $room->room_number }}"
                                 data-type="{{ $room->type }}"
@@ -152,12 +153,43 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-<!-- jQuery + DataTables JS (CDN) -->
+{{-- JS to populate view modal --}}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const viewButton = document.querySelectorAll('.viewBtn');
+    const editForm = document.getElementById('viewModal');
 
+    viewButton.forEach(button => {
+        button.addEventListener('click', () => {
+
+            editForm.action = `/rooms/${button.dataset.id}`;
+
+            
+            document.getElementById('view_type').value = button.dataset.type ?? 'no type';
+            document.getElementById('edit_price_type').value = button.dataset.price_type ?? '';
+            document.getElementById('edit_base_price').value = button.dataset.price ?? '';
+            document.getElementById('edit_is_time_based').checked = (button.dataset.is_time_based == '1');
+            document.getElementById('edit_number_of_beds').value = button.dataset.beds ?? '';
+            document.getElementById('edit_capacity').value = button.dataset.capacity ?? '';
+            document.getElementById('edit_status').value = button.dataset.status ?? '';
+            document.getElementById('edit_description').value = button.dataset.description ?? '';
+        });
+    });
+
+
+
+});
+</script>
+
+<!-- jQuery -->
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
 
+<!-- DataTables JS (Bootstrap 5) -->
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
 <script>
 $(document).ready(function() {
     $('#rooms-table').DataTable({

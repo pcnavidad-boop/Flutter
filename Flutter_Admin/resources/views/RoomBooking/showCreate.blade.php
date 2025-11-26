@@ -32,7 +32,7 @@
                 </div>
             @endif
 
-            <form action="{{ route('room_booking.create') }}" method="POST">
+            <form action="{{ route('room_booking.store_data') }}" method="POST">
                 @csrf
 
                 <div class="row">
