@@ -14,17 +14,15 @@ class ServiceBookingController extends Controller
     // View list of service bookings
     public function index(Request $request)
     {
-        $query = ServiceBooking::with('service')->orderBy('booking_date', 'desc');
+        $query = ServiceBooking::with('service')
+            ->orderBy('booking_date', 'desc');
 
-        // Allow NotificationController to redirect using ?ref=
         if ($request->filled('ref')) {
             $query->where('reference', $request->ref);
         }
 
-        $bookings = $query->get();
-
         return view('service_booking.index', [
-            'bookings'     => $bookings,
+            'bookings'     => $query->get(),
             'highlightRef' => $request->ref ?? null,
         ]);
     }
@@ -47,30 +45,32 @@ class ServiceBookingController extends Controller
             'service_id'       => 'required|exists:services,id',
             'appointment_date' => 'required|date',
 
-            'start_time'       => 'nullable|date_format:H:i',
-            'end_time'         => 'nullable|date_format:H:i|after_or_equal:start_time',
+            'start_time'       => 'required|date_format:H:i',
+            'end_time'         => 'required|date_format:H:i|after:start_time',
 
             'number_of_guests' => 'required|integer|min:1',
             'remarks'          => 'nullable|string|max:2000',
+
             'type'             => ['nullable', Rule::in(['website','walk-in','phone','email'])],
         ]);
 
         $service = Service::findOrFail($data['service_id']);
-        $svcType = $service->service_type;
 
-        // Operating hours validation
-        $request->validate([
-            'start_time' => 'required|date_format:H:i',
-            'end_time'   => 'required|date_format:H:i|after:start_time',
-        ]);
-
-        if (!($service->start_time && $service->end_time)) {
+        // Enforce status + archive rules
+        if ($service->is_archived) {
             return back()->withErrors([
-                'start_time' => "This service has no operating hours configured."
+                'service_id' => 'Cannot book an archived service.'
+            ]);
+        }
+        if ($service->status === 'maintenance') {
+            return back()->withErrors([
+                'service_id' => 'This service is under maintenance.'
             ]);
         }
 
-        // Ensure requested times fall within operating hours
+        $svcType = $service->service_type;
+
+        // Operating hours enforcement
         $svcStart = Carbon::createFromFormat('H:i', $service->start_time);
         $svcEnd   = Carbon::createFromFormat('H:i', $service->end_time);
         $reqStart = Carbon::createFromFormat('H:i', $data['start_time']);
@@ -78,21 +78,22 @@ class ServiceBookingController extends Controller
 
         if ($reqStart->lt($svcStart) || $reqEnd->gt($svcEnd)) {
             return back()->withErrors([
-                'start_time' =>
-                    "Appointment must be within operating hours ({$service->start_time} - {$service->end_time})."
+                'start_time' => "Appointment must be within operating hours "
+                              . "({$service->start_time} - {$service->end_time})."
             ])->withInput();
         }
 
-        // Capacity rule
-        $capacityRequired = in_array($svcType, ['restaurant','bar','spa']);
-
-        if ($capacityRequired) {
-            $request->validate([
-                'number_of_guests' => "required|integer|min:1|max:{$service->capacity}"
-            ]);
+        // Capacity enforcement
+        if (in_array($svcType, ['restaurant','bar','spa'])) {
+            if ($data['number_of_guests'] > $service->capacity) {
+                return back()->withErrors([
+                    'number_of_guests' =>
+                        "Maximum {$service->capacity} guests allowed."
+                ])->withInput();
+            }
         }
 
-        // Conflict check
+        // Conflict detection
         if ($this->hasConflict($service, $data)) {
             return back()->withErrors([
                 'appointment_date' =>
@@ -100,8 +101,9 @@ class ServiceBookingController extends Controller
             ])->withInput();
         }
 
-        // Create booking
+        // Save booking
         $booking = new ServiceBooking();
+
         $booking->guest_name       = $data['guest_name'];
         $booking->guest_email      = $data['guest_email'];
         $booking->guest_contact    = $data['guest_contact'] ?? null;
@@ -114,27 +116,41 @@ class ServiceBookingController extends Controller
         $booking->number_of_guests = $data['number_of_guests'];
         $booking->remarks          = $data['remarks'] ?? null;
 
-        $booking->type = $data['type'] ?? 'website';
+        $booking->type             = $data['type'] ?? 'website';
 
         // System fields
-        $booking->user_id        = auth()->id();
-        $booking->booking_status = 'confirmed';
-        $booking->payment_status = 'downpayment';
+        $booking->created_by       = auth()->id();
+        $booking->booking_status   = 'confirmed';
+        $booking->payment_status   = 'downpayment';
 
         $booking->save();
 
-        // Calculate total price
+        // Compute price
         $booking->total_price = BookingCalculator::computeTotal($booking);
         $booking->save();
 
         return redirect()
             ->route('service_booking.index_page')
-            ->with('success', 'Service booking created.');
+            ->with('success', 'Service booking created successfully.');
     }
 
     // Update a service booking
     public function update(Request $request, ServiceBooking $booking)
     {
+        // Cannot update completed/cancelled bookings
+        if (in_array($booking->booking_status, ['completed','cancelled'])) {
+            return back()->withErrors([
+                'error' => 'Cannot update completed or cancelled bookings.'
+            ]);
+        }
+
+        // Prevent updates if payments exist
+        if ($booking->payments()->exists()) {
+            return back()->withErrors([
+                'error' => 'Cannot update this booking because payments already exist.'
+            ]);
+        }
+
         $data = $request->validate([
             'guest_name'       => 'required|string|max:255',
             'guest_email'      => 'required|email|max:255',
@@ -142,10 +158,9 @@ class ServiceBookingController extends Controller
 
             'appointment_date' => 'required|date',
             'start_time'       => 'required|date_format:H:i',
-            'end_time'         => 'required|date_format:H:i|after_or_equal:start_time',
+            'end_time'         => 'required|date_format:H:i|after:start_time',
 
             'number_of_guests' => 'required|integer|min:1',
-
             'remarks'          => 'nullable|string|max:2000',
 
             'type'             => ['nullable', Rule::in(['website','walk-in','phone','email'])],
@@ -155,19 +170,27 @@ class ServiceBookingController extends Controller
         ]);
 
         $service = $booking->service;
-        $svcType = $service->service_type;
 
-        // Capacity rule
-        if (in_array($svcType, ['restaurant','bar','spa']) &&
-            $data['number_of_guests'] > $service->capacity) {
-
+        // Cannot update booking if service is archived/maintenance
+        if ($service->is_archived) {
             return back()->withErrors([
-                'number_of_guests' =>
-                    "Capacity exceeded. Max allowed: {$service->capacity} guest(s)."
+                'error' => 'Cannot update a booking of an archived service.'
+            ]);
+        }
+        if ($service->status === 'maintenance') {
+            return back()->withErrors([
+                'error' => 'Cannot update booking while service is under maintenance.'
             ]);
         }
 
-        // Time falls within service hours
+        // Cannot change service_id
+        if ($request->service_id && $request->service_id != $booking->service_id) {
+            return back()->withErrors([
+                'service_id' => 'Cannot reassign this booking to a different service.'
+            ]);
+        }
+
+        // Operate hours validation
         $svcStart = Carbon::createFromFormat('H:i', $service->start_time);
         $svcEnd   = Carbon::createFromFormat('H:i', $service->end_time);
         $reqStart = Carbon::createFromFormat('H:i', $data['start_time']);
@@ -176,19 +199,30 @@ class ServiceBookingController extends Controller
         if ($reqStart->lt($svcStart) || $reqEnd->gt($svcEnd)) {
             return back()->withErrors([
                 'start_time' =>
-                    "Appointment must be within operating hours ({$service->start_time} - {$service->end_time})."
+                    "Appointment must be within operating hours "
+                    . "({$service->start_time} - {$service->end_time})."
             ]);
         }
 
-        // Conflict check (exclude self)
+        // Capacity rules
+        if (in_array($service->service_type, ['restaurant','bar','spa']) &&
+            $data['number_of_guests'] > $service->capacity) {
+
+            return back()->withErrors([
+                'number_of_guests' =>
+                    "Maximum {$service->capacity} guests allowed."
+            ]);
+        }
+
+        // Conflict detection
         if ($this->hasConflict($service, $data, $booking->id)) {
             return back()->withErrors([
                 'appointment_date' =>
                     "This service is already fully booked at that time."
-            ])->withInput();
+            ]);
         }
 
-        // Update safe fields
+        // Apply updates
         $booking->guest_name       = $data['guest_name'];
         $booking->guest_email      = $data['guest_email'];
         $booking->guest_contact    = $data['guest_contact'] ?? null;
@@ -200,9 +234,9 @@ class ServiceBookingController extends Controller
         $booking->number_of_guests = $data['number_of_guests'];
         $booking->remarks          = $data['remarks'] ?? null;
 
-        $booking->type               = $data['type'] ?? $booking->type;
-        $booking->booking_status     = $data['booking_status'];
-        $booking->payment_status     = $data['payment_status'];
+        $booking->type                 = $data['type'] ?? $booking->type;
+        $booking->booking_status       = $data['booking_status'];
+        $booking->payment_status       = $data['payment_status'];
         $booking->status_change_reason = $data['status_change_reason'] ?? null;
 
         $booking->total_price = BookingCalculator::computeTotal($booking);
@@ -215,17 +249,30 @@ class ServiceBookingController extends Controller
     // Delete a service booking
     public function destroy(ServiceBooking $booking)
     {
+        // Prevent deleting completed or cancelled bookings
+        if (in_array($booking->booking_status, ['completed','cancelled'])) {
+            return back()->withErrors([
+                'error' => 'Cannot delete completed or cancelled bookings.'
+            ]);
+        }
+
+        // Prevent delete if payments exist
+        if ($booking->payments()->exists()) {
+            return back()->withErrors([
+                'error' => 'Cannot delete this booking because payments already exist.'
+            ]);
+        }
+
         $booking->delete();
 
         return back()->with('success', 'Service booking deleted.');
     }
 
-    // Check for booking conflicts
+    // Conflict detection logic
     private function hasConflict(Service $service, array $data, $ignoreId = null): bool
     {
         $svcType = $service->service_type;
 
-        // Base query
         $base = ServiceBooking::where('service_id', $service->id)
             ->where('booking_status', '!=', 'cancelled')
             ->whereDate('appointment_date', $data['appointment_date']);
@@ -234,10 +281,9 @@ class ServiceBookingController extends Controller
             $base->where('id', '!=', $ignoreId);
         }
 
-        // Time-based capacity (e.g. spa, restaurant, bar)
-        if (in_array($svcType, ['spa','restaurant','bar'])) {
+        // Time-overlapping bookings
+        if (in_array($svcType, ['spa', 'restaurant', 'bar'])) {
 
-            // Count overlapping bookings
             $count = (clone $base)
                 ->where('start_time', '<', $data['end_time'])
                 ->where('end_time', '>', $data['start_time'])
@@ -246,12 +292,11 @@ class ServiceBookingController extends Controller
             return $count >= $service->capacity;
         }
 
-        // Date-based capacity (e.g. gym, swimming pool)
-        if (in_array($svcType, ['gym','swimming_pool'])) {
-            $count = $base->count();
-            return $count >= $service->capacity;
+        // Date-only capacity service
+        if (in_array($svcType, ['gym', 'swimming_pool'])) {
+            return $base->count() >= $service->capacity;
         }
 
-        return false; 
+        return false;
     }
 }

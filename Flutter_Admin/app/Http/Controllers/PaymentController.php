@@ -12,14 +12,14 @@ class PaymentController extends Controller
     // View all payments
     public function index()
     {
-        $payments = Payment::with(['payable', 'user'])
-            ->orderBy('date', 'desc')
+        $payments = Payment::with(['payable', 'processor'])
+            ->orderBy('paid_at', 'desc')
             ->get();
 
         return view('payment.index', compact('payments'));
     }
 
-    // Create offline payment
+    // Create an offline payment
     public function create(Request $request)
     {
         $data = $request->validate([
@@ -30,24 +30,24 @@ class PaymentController extends Controller
             'status'            => 'required|in:completed,refunded',
         ]);
 
-        // Validate reference format
+        // Reference validation
         if ($data['booking_type'] === 'room' &&
             !PaymentService::isRoomReference($data['booking_reference'])) {
-
             return back()->withErrors([
-                'booking_reference' => 'Invalid room reference format (RB-XXXXXXXX expected).'
+                'booking_reference' =>
+                    'Invalid room booking reference. (RB-XXXXXXXX expected)'
             ]);
         }
 
         if ($data['booking_type'] === 'service' &&
             !PaymentService::isServiceReference($data['booking_reference'])) {
-
             return back()->withErrors([
-                'booking_reference' => 'Invalid service reference format (SB-XXXXXXXX expected).'
+                'booking_reference' =>
+                    'Invalid service booking reference. (SB-XXXXXXXX expected)'
             ]);
         }
 
-        // Find booking by reference
+        // Locate booking
         $booking = PaymentService::findBookingByReference(
             $data['booking_type'],
             $data['booking_reference']
@@ -59,25 +59,53 @@ class PaymentController extends Controller
             ]);
         }
 
+        // Prevent payments for archived services/rooms
+        if (method_exists($booking->payable, 'is_archived') &&
+            $booking->payable->is_archived) {
+            return back()->withErrors([
+                'error' => 'Cannot pay for a booking belonging to an archived item.'
+            ]);
+        }
+
+        // Prevent payments on invalid booking statuses
+        if (in_array($booking->booking_status, [
+            'cancelled', 'checked_out', 'completed'
+        ])) {
+            return back()->withErrors([
+                'error' =>
+                    'Cannot process payment for a completed or cancelled booking.'
+            ]);
+        }
+
         // Prevent overpayment
         $remaining = PaymentService::remainingBalance($booking);
 
-        if ($data['amount'] > $remaining && $data['status'] === 'completed') {
+        if ($data['status'] === 'completed' && $data['amount'] > $remaining) {
             return back()->withErrors([
-                'amount' => "This payment exceeds the remaining balance of ₱" . number_format($remaining, 2)
+                'amount' =>
+                    "Payment exceeds remaining balance of ₱" .
+                    number_format($remaining, 2)
+            ]);
+        }
+
+        // Prevent adding payments if already fully paid
+        if ($booking->payment_status === 'fully_paid') {
+            return back()->withErrors([
+                'error' => 'This booking is already fully paid.'
             ]);
         }
 
         // Record payment
         $payment = $booking->payments()->create([
-            'user_id'   => Auth::id(),
-            'amount'    => $data['amount'],
-            'method'    => $data['method'],
-            'status'    => $data['status'],
-            'channel'   => 'offline',
-            'date'      => now(),
+            'processed_by' => Auth::id(),
+            'amount'       => $data['amount'],
+            'method'       => $data['method'],
+            'status'       => $data['status'],
+            'channel'      => 'offline',
+            'paid_at'      => now(),
         ]);
 
+        // Update booking payment status
         PaymentService::updateBookingPaymentStatus($booking);
 
         return redirect()
@@ -90,36 +118,52 @@ class PaymentController extends Controller
     {
         $booking = $payment->payable;
 
-        // Rule 1: Cannot delete online/API payments
+        // Rule: Cannot delete API stripe payments
         if ($payment->method === 'api') {
             return back()->withErrors([
-                'error' => 'Online (API) payments cannot be deleted. Issue a Stripe refund instead.'
+                'error' => 'Stripe (API) payments cannot be deleted.'
             ]);
         }
 
-        // Rule 2: Cannot delete payments for finalized bookings
-        if (in_array($booking->booking_status, ['checked_out', 'cancelled'])) {
-            return back()->withErrors([
-                'error' => 'Payments for completed or cancelled bookings cannot be deleted.'
-            ]);
-        }
-
-        // Rule 3: Cannot delete refunded payments
+        // Rule: Cannot delete refunded payments
         if ($payment->status === 'refunded') {
             return back()->withErrors([
                 'error' => 'Refunded payments cannot be deleted.'
             ]);
         }
 
-        // Rule 4: Cannot delete if booking is fully paid
-        if ($booking->payment_status === 'fully_paid') {
+        // Rule: Cannot delete payments for completed/cancelled bookings
+        if (in_array($booking->booking_status, [
+            'cancelled', 'checked_out', 'completed'
+        ])) {
             return back()->withErrors([
-                'error' => 'Cannot delete this payment because the booking is fully paid.'
+                'error' => 'Cannot delete payments for completed or cancelled bookings.'
             ]);
         }
 
-        // PASS — delete payment
+        // Rule: Cannot delete if booking item is archived
+        if (method_exists($booking->payable, 'is_archived') &&
+            $booking->payable->is_archived) {
+            return back()->withErrors([
+                'error' => 'Cannot delete payments for archived rooms/services.'
+            ]);
+        }
+
+        // Rule: Cannot delete if it would cause negative balance
+        $remainingAfterDelete =
+            PaymentService::remainingBalance($booking) + $payment->amount;
+
+        if ($remainingAfterDelete < 0) {
+            return back()->withErrors([
+                'error' =>
+                    'This payment cannot be deleted because it breaks balance consistency.'
+            ]);
+        }
+
+        // All good — delete payment
         $payment->delete();
+
+        // Recompute booking payment status
         PaymentService::updateBookingPaymentStatus($booking);
 
         return back()->with('success', 'Payment deleted and booking updated.');

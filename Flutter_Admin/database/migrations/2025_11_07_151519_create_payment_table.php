@@ -6,34 +6,41 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
 
-            // Foreign Key
-            $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('cascade');
+            // Relationships
+            $table->foreignId('processed_by')->nullable()->constrained('users')->onDelete('cascade');
 
-            // Polymorphic relationship (RoomBooking or ServiceBooking)
-            $table->morphs('payable'); 
+            // Polymorphic (RoomBooking or ServiceBooking)
+            $table->morphs('payable');
 
             // Payment Details
             $table->string('reference')->unique();
             $table->decimal('amount', 10, 2);
-            $table->date('date');
+            $table->date('paid_at'); 
             $table->enum('method', ['api', 'cash', 'card', 'bank_transfer', 'e_wallet'])->default('cash');
-            $table->enum('channel', ['online','offline'])->default('offline');
+            $table->enum('channel', ['online', 'offline'])->default('offline');
             $table->enum('status', ['completed', 'refunded'])->default('completed');
 
-            $table->index('user_id');
+            // Indexes
+            $table->index('processed_by');
             $table->index('method');
             $table->index('status');
-            $table->index('date');
+            $table->index('paid_at');
 
             $table->timestamps();
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
         Schema::dropIfExists('payments');

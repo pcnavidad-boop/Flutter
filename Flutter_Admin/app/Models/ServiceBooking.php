@@ -19,11 +19,13 @@ class ServiceBooking extends Model
         'appointment_date',
         'start_time',
         'end_time',
+        'total_price',
         'remarks',
         'type',
         'booking_status',
         'payment_status',
         'status_change_reason',
+        'created_by',
     ];
 
     protected $casts = [
@@ -40,13 +42,9 @@ class ServiceBooking extends Model
         parent::boot();
 
         static::creating(function ($booking) {
-            
-            // Booking Reference SB-XXXXXXXX
             if (!$booking->reference) {
                 $booking->reference = 'SB-' . strtoupper(Str::random(8));
             }
-
-            // System-generated (never editable)
             $booking->booking_date = now();
         });
     }
@@ -57,9 +55,9 @@ class ServiceBooking extends Model
         return $this->belongsTo(Service::class);
     }
 
-    public function user()
+    public function creator()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function payments()
@@ -67,7 +65,7 @@ class ServiceBooking extends Model
         return $this->morphMany(Payment::class, 'payable');
     }
 
-    // Payment helpers
+    // Scopes and Calculated Attributes
     public function totalPaymentsCompleted()
     {
         return $this->payments()->where('status', 'completed')->sum('amount');
@@ -83,7 +81,7 @@ class ServiceBooking extends Model
         return max(0, $this->total_price - $this->totalPaymentsCompleted());
     }
 
-    // Accessors 
+    // Accessors
     public function getFormattedPriceAttribute()
     {
         return number_format($this->total_price ?? 0, 2);
@@ -104,13 +102,13 @@ class ServiceBooking extends Model
         return $date;
     }
 
-    // Notification email routing
+    // Notification Routing
     public function routeNotificationForMail(): string
     {
         return $this->guest_email;
     }
 
-    // Appended virtual fields
+    // Appended attributes
     protected $appends = [
         'formatted_price',
         'service_schedule',

@@ -12,6 +12,7 @@ class Service extends Model
 
     protected $fillable = [
         'name',
+        'location',
         'service_type',
         'description',
         'capacity',
@@ -22,7 +23,7 @@ class Service extends Model
         'end_time',
         'status',
         'is_archived',
-        'user_id',
+        'created_by',
         'slug',
     ];
 
@@ -49,24 +50,23 @@ class Service extends Model
         });
     }
 
-    // Use slug for route model binding
     public function getRouteKeyName()
     {
         return 'slug';
     }
 
     // Relationships
-    public function user()
+    public function creator()
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function bookings()
     {
-        return $this->hasMany(ServiceBooking::class, 'service_id');
+        return $this->hasMany(ServiceBooking::class);
     }
 
-    // Scopes 
+    // Scopes
     public function scopeAvailable($query)
     {
         return $query->where('status', 'available');
@@ -77,13 +77,13 @@ class Service extends Model
         return $query->where('is_archived', false);
     }
 
-    // Mutators 
+    // Accessors
     public function setNameAttribute($value)
     {
         $this->attributes['name'] = ucwords(strtolower($value));
     }
 
-    // Accessors 
+    // Mutators
     public function getFormattedPriceAttribute()
     {
         return number_format($this->base_price, 2);
@@ -99,14 +99,14 @@ class Service extends Model
     public function getPriceLabelAttribute()
     {
         return match ($this->price_type) {
-            'per_hour'    => "{$this->formatted_price} / hour",
-            'per_day'     => "{$this->formatted_price} / day",
-            'per_person'  => "{$this->formatted_price} / person",
-            default        => "{$this->formatted_price}",
+            'per_hour'   => "{$this->formatted_price} / hour",
+            'per_day'    => "{$this->formatted_price} / day",
+            'per_person' => "{$this->formatted_price} / person",
+            default      => $this->formatted_price,
         };
     }
 
-    // Appended virtual fields
+    // Appended attributes
     protected $appends = [
         'formatted_price',
         'schedule',

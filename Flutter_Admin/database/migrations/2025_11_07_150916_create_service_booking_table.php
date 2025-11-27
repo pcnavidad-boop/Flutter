@@ -14,17 +14,17 @@ return new class extends Migration
         Schema::create('service_bookings', function (Blueprint $table) {
             $table->id();
 
-            // Foreign Keys
+            // Relationships
             $table->foreignId('service_id')->constrained('services')->onDelete('cascade');
-            $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('cascade');
+            $table->foreignId('created_by')->nullable()->constrained('users')->onDelete('cascade');
 
             // Guest Information
             $table->string('guest_name');
-            $table->string('guest_email');
+            $table->string('guest_email'); 
             $table->string('guest_contact')->nullable();
-        
+
             // Booking Details
-            $table->integer('number_of_guests')->default(1);
+            $table->unsignedSmallInteger('number_of_guests')->default(1);
             $table->date('appointment_date');
             $table->time('start_time')->nullable();
             $table->time('end_time')->nullable();
@@ -38,14 +38,12 @@ return new class extends Migration
             $table->enum('booking_status', ['confirmed','completed','cancelled'])->default('confirmed');
             $table->enum('payment_status', ['downpayment','fully_paid','refunded'])->default('downpayment');
             $table->text('status_change_reason')->nullable();
-            
+
             // Indexes
             $table->index('service_id');
-            $table->index('user_id');
-
+            $table->index('created_by');
             $table->index('booking_status');
             $table->index('payment_status');
-
             $table->index('booking_date');
             $table->index('appointment_date');
 

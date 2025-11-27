@@ -13,62 +13,49 @@ class Payment extends Model
     protected $fillable = [
         'amount',
         'method',
-        'status',
-        'user_id',
         'channel',
+        'status',
+        'processed_by',
+        'paid_at',
     ];
 
     protected $casts = [
-        'amount' => 'decimal:2',
-        'date'   => 'date',
+        'amount'  => 'decimal:2',
+        'paid_at' => 'date',
     ];
 
-    // Auto-generate reference, date, channel
+    // Auto-generate reference, paid_at, and default channel
     protected static function boot()
     {
         parent::boot();
 
         static::creating(function ($payment) {
 
-            // Random unique reference
             do {
                 $ref = 'PAY-' . strtoupper(Str::random(10));
             } while (Payment::where('reference', $ref)->exists());
 
             $payment->reference = $ref;
 
-            // System-generated date
-            if (!$payment->date) {
-                $payment->date = now()->toDateString();
+            if (!$payment->paid_at) {
+                $payment->paid_at = now();
             }
 
-            // Default channel
             if (!$payment->channel) {
                 $payment->channel = 'offline';
             }
         });
     }
 
-    // Polymorphic Relationship
+    // Relationships
     public function payable()
     {
         return $this->morphTo();
     }
 
-    public function user()
+    public function processor()
     {
-        return $this->belongsTo(User::class, 'user_id');
-    }
-
-    // Scopes
-    public function scopeCompleted($query)
-    {
-        return $query->where('status', 'completed');
-    }
-
-    public function scopeRefunded($query)
-    {
-        return $query->where('status', 'refunded');
+        return $this->belongsTo(User::class, 'processed_by');
     }
 
     // Accessors
@@ -79,7 +66,7 @@ class Payment extends Model
 
     public function getFormattedDateAttribute()
     {
-        return $this->date ? $this->date->format('M d, Y') : null;
+        return $this->paid_at ? $this->paid_at->format('M d, Y') : null;
     }
 
     public function getPaymentLabelAttribute()
@@ -87,6 +74,7 @@ class Payment extends Model
         return "{$this->formatted_amount} ({$this->method})";
     }
 
+    // Appended attributes
     protected $appends = [
         'formatted_amount',
         'formatted_date',

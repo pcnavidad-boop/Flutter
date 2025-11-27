@@ -14,39 +14,37 @@ return new class extends Migration
         Schema::create('rooms', function (Blueprint $table) {
             $table->id();
 
-            // Foreign Key
-            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            // Relationship
+            $table->foreignId('created_by')->constrained('users')->onDelete('cascade');
 
             // Room Identification
             $table->string('name')->unique();
             $table->string('room_number')->unique();
-            $table->enum('room_type', ['single','double','quad','family','suite','penthouse','function'])->default('single');
-            $table->text('description');
-            $table->string('image');
+            $table->enum('room_type', ['single','double','quad','family','suite','penthouse','function']);            
+            $table->text('description');     
+            $table->string('image');         
+            $table->string('slug')->unique();
 
             // Pricing
-            $table->enum('price_type', ['per_night','per_event_per_day'])->default('per_night');
+            $table->enum('price_type', ['per_night', 'per_event_per_day']);
             $table->decimal('base_price', 10, 2)->default(0);
 
             // Capacity
-            $table->integer('number_of_beds')->nullable();
-            $table->integer('capacity')->default(1);
+            $table->unsignedSmallInteger('number_of_beds')->nullable();
+            $table->unsignedSmallInteger('capacity');
 
-            // Availability
-            $table->enum('status', ['available','occupied','maintenance'])->default('available');
+            // Availability (occupancy now computed dynamically)
+            $table->enum('status', ['available', 'maintenance'])->default('available');
 
             // Archive Status
             $table->boolean('is_archived')->default(false);
 
-            // URL Slug
-            $table->string('slug')->unique();
-
             // Indexes
+            $table->index('created_by');
             $table->index('room_type');
             $table->index('price_type');
             $table->index('status');
             $table->index('is_archived');
-            $table->index('user_id');
 
             $table->timestamps();
         });

@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Str;
 use Illuminate\Notifications\Notifiable;
-use Carbon\Carbon;
 
 class RoomBooking extends Model
 {
@@ -19,19 +18,20 @@ class RoomBooking extends Model
         'number_of_guests',
         'start_date',
         'end_date',
+        'total_price',
         'remarks',
         'type',
         'booking_status',
         'payment_status',
         'status_change_reason',
+        'created_by',
     ];
 
     protected $casts = [
-        'total_price'   => 'decimal:2',
-        'booking_date'  => 'date',
-
-        'start_date'    => 'date',
-        'end_date'      => 'date',
+        'total_price'  => 'decimal:2',
+        'booking_date' => 'date',
+        'start_date'   => 'date',
+        'end_date'     => 'date',
     ];
 
     // Auto-generate reference + booking_date
@@ -40,13 +40,9 @@ class RoomBooking extends Model
         parent::boot();
 
         static::creating(function ($booking) {
-
-            // Booking Reference RB-XXXXXXXX
             if (!$booking->reference) {
                 $booking->reference = 'RB-' . strtoupper(Str::random(8));
             }
-
-            // System-generated (never editable)
             $booking->booking_date = now();
         });
     }
@@ -57,9 +53,9 @@ class RoomBooking extends Model
         return $this->belongsTo(Room::class);
     }
 
-    public function user()
+    public function creator()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function payments()
@@ -67,19 +63,15 @@ class RoomBooking extends Model
         return $this->morphMany(Payment::class, 'payable');
     }
 
-    // Payment helpers
+    // Scopes and Calculated Attributes
     public function totalPaymentsCompleted()
     {
-        return $this->payments()
-            ->where('status', 'completed')
-            ->sum('amount');
+        return $this->payments()->where('status', 'completed')->sum('amount');
     }
 
     public function totalPaymentsRefunded()
     {
-        return $this->payments()
-            ->where('status', 'refunded')
-            ->sum('amount');
+        return $this->payments()->where('status', 'refunded')->sum('amount');
     }
 
     public function getRemainingBalanceAttribute()
@@ -93,7 +85,6 @@ class RoomBooking extends Model
         if ($this->start_date && $this->end_date) {
             return $this->start_date->format('M d, Y') . " - " . $this->end_date->format('M d, Y');
         }
-
         return null;
     }
 
@@ -112,17 +103,18 @@ class RoomBooking extends Model
         return $this->room && $this->room->room_type !== 'function';
     }
 
-    // Notification email routing
+    // Notification Routing
     public function routeNotificationForMail(): string
     {
         return $this->guest_email;
     }
 
-    // Appended virtual fields
+    // Appended attributes
     protected $appends = [
         'period',
         'schedule_display',
         'is_function_booking',
         'is_stay_booking',
+        'remaining_balance',
     ];
 }

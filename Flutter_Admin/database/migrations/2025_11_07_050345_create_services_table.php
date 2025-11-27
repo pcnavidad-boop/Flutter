@@ -14,39 +14,40 @@ return new class extends Migration
         Schema::create('services', function (Blueprint $table) {
             $table->id();
 
-            // Foreign Key 
-            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            // Relationship
+            $table->foreignId('created_by')->constrained('users')->onDelete('cascade');
 
             // Service Identification
             $table->string('name')->unique();
-            $table->enum('service_type', ['restaurant','spa','gym','swimming_pool','bar'])->default('restaurant');
-            $table->text('description');
-            $table->string('image');
+            $table->string('location');
+            $table->enum('service_type', ['restaurant','spa','gym','swimming_pool','bar']);
+            $table->text('description'); 
+            $table->string('image');     
+            $table->string('slug')->unique();
 
             // Pricing
-            $table->enum('price_type', ['per_hour', 'per_day', 'per_person'])->default('per_hour');
+            $table->enum('price_type', ['per_hour', 'per_day', 'per_person']);
             $table->decimal('base_price', 10, 2)->default(0);
 
             // Capacity
-            $table->integer('capacity')->default(1);
+            $table->unsignedSmallInteger('capacity')->default(1);
 
-            // Availability
+            // Operating Hours
             $table->time('start_time');
             $table->time('end_time');
-            $table->enum('status', ['available','occupied','maintenance'])->default('available');
-            
+
+            // Availability (occupancy now computed dynamically)
+            $table->enum('status', ['available', 'maintenance'])->default('available');
+
             // Archive Status
             $table->boolean('is_archived')->default(false);
 
-            // URL Slug
-            $table->string('slug')->unique();
-
             // Indexes
+            $table->index('created_by');
             $table->index('service_type');
             $table->index('price_type');
             $table->index('status');
             $table->index('is_archived');
-            $table->index('user_id');
 
             $table->timestamps();
         });

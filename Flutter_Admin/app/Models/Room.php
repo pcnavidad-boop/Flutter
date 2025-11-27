@@ -14,7 +14,7 @@ class Room extends Model
         'name',
         'room_number',
         'room_type',
-        'price_type',    
+        'price_type',
         'base_price',
         'number_of_beds',
         'capacity',
@@ -22,7 +22,7 @@ class Room extends Model
         'description',
         'image',
         'is_archived',
-        'user_id',
+        'created_by',
         'slug',
     ];
 
@@ -31,7 +31,7 @@ class Room extends Model
         'is_archived' => 'boolean',
     ];
 
-    // Automatically generate & update slugs
+    // Auto-generate & update slugs
     protected static function boot()
     {
         parent::boot();
@@ -53,14 +53,14 @@ class Room extends Model
     }
 
     // Relationships
-    public function user()
+    public function creator()
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function bookings()
     {
-        return $this->hasMany(RoomBooking::class, 'room_id');
+        return $this->hasMany(RoomBooking::class);
     }
 
     // Scopes
@@ -93,11 +93,7 @@ class Room extends Model
 
     public function getPriceLabelAttribute()
     {
-        return match ($this->price_type) {
-            'per_night' => $this->formatted_price . ' / night',
-            'per_event_per_day' => $this->formatted_price . ' / event',
-            default     => $this->formatted_price,
-        };
+        return $this->formatted_price . ($this->price_type === 'per_night' ? ' / night' : ' / event');
     }
 
     public function getIsFunctionRoomAttribute()
@@ -109,13 +105,12 @@ class Room extends Model
     {
         return match ($this->status) {
             'available'   => 'success',
-            'occupied'    => 'danger',
             'maintenance' => 'warning',
             default        => 'secondary',
         };
     }
 
-    // Appended virtual fields
+    // Appended attributes
     protected $appends = [
         'formatted_price',
         'price_label',

@@ -14,22 +14,22 @@ return new class extends Migration
         Schema::create('room_bookings', function (Blueprint $table) {
             $table->id();
 
-            // Foreign Keys
+            // Relationships
             $table->foreignId('room_id')->constrained('rooms')->onDelete('cascade');
-            $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('cascade');
+            $table->foreignId('created_by')->nullable()->constrained('users')->onDelete('cascade');
 
             // Guest Information
             $table->string('guest_name');
-            $table->string('guest_email');
+            $table->string('guest_email');     
             $table->string('guest_contact')->nullable();
 
             // Booking Details
-            $table->integer('number_of_guests')->default(1);
+            $table->unsignedSmallInteger('number_of_guests')->default(1);
             $table->date('start_date');
             $table->date('end_date');
             $table->decimal('total_price', 10, 2)->nullable();
             $table->text('remarks')->nullable();
-            
+
             // Booking Life Cycle
             $table->string('reference')->unique();
             $table->enum('type', ['website','walk-in','phone','email'])->default('website');
@@ -38,17 +38,15 @@ return new class extends Migration
             $table->enum('payment_status', ['downpayment','fully_paid','refunded'])->default('downpayment');
             $table->text('status_change_reason')->nullable();
 
-            // Indexes
+            // Indexes for performance
             $table->index('room_id');
-            $table->index('user_id');
-
+            $table->index('created_by');
             $table->index('booking_status');
             $table->index('payment_status');
-
             $table->index('start_date');
             $table->index('end_date');
             $table->index('booking_date');
-            $table->index(['room_id', 'booking_status']);
+            $table->index(['room_id', 'start_date', 'end_date']);
 
             $table->timestamps();
         });

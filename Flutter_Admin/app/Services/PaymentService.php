@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\RoomBooking;
 use App\Models\ServiceBooking;
+use App\Services\BookingCalculator;
 
 class PaymentService
 {
@@ -25,10 +26,10 @@ class PaymentService
         return null;
     }
 
-    // Find booking by reference
+
+    // Find booking via reference
     public static function findBookingByReference(string $type, string $reference)
     {
-        // Validate reference format
         if ($type === 'room' && !self::isRoomReference($reference)) {
             return null;
         }
@@ -44,46 +45,54 @@ class PaymentService
         };
     }
 
+
     // Update booking payment status based on payments
     public static function updateBookingPaymentStatus($booking): void
     {
         $total = BookingCalculator::computeTotal($booking);
 
-        $paid = (float) $booking->totalPaymentsCompleted();
+        $paid     = (float) $booking->totalPaymentsCompleted();
         $refunded = (float) $booking->totalPaymentsRefunded();
 
         $netPaid = max(0, $paid - $refunded);
 
+        // FULLY REFUNDED
         if ($netPaid == 0 && $refunded > 0) {
             $booking->payment_status = 'refunded';
             $booking->save();
             return;
         }
 
+        // FULLY PAID
         if ($netPaid >= $total && $total > 0) {
             $booking->payment_status = 'fully_paid';
             $booking->save();
             return;
         }
 
+        // DOWNPAYMENT MADE
         if ($netPaid > 0) {
             $booking->payment_status = 'downpayment';
             $booking->save();
             return;
         }
 
+        // DEFAULT
         $booking->payment_status = 'downpayment';
         $booking->save();
     }
 
-    // Downpayment calculation (30%)
+
+    // 30% Downpayment calculation
     public static function requiredDownpayment($booking): float
     {
         $total = BookingCalculator::computeTotal($booking);
+
         return round($total * 0.30, 2);
     }
 
-    // Remaining balance calculation
+
+    // Remaining balance
     public static function remainingBalance($booking): float
     {
         return BookingCalculator::remainingBalance($booking);
