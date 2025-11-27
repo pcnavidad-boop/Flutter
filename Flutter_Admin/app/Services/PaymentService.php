@@ -7,80 +7,36 @@ use App\Models\ServiceBooking;
 
 class PaymentService
 {
-    /**
-     * Recalculate the booking's payment status
-     * using the new centralized BookingCalculator engine.
-     */
-    public static function updateBookingPaymentStatus($booking): void
+    // Validate booking reference format
+    public static function isRoomReference(string $reference): bool
     {
-        $total = BookingCalculator::computeTotal($booking);
-        $paid  = (float) $booking->totalPaymentsCompleted();
-        $refunded = (float) $booking->totalPaymentsRefunded();
-
-        // Case 1 — Fully refunded
-        if ($paid == 0 && $refunded > 0) {
-            $booking->payment_status = 'refunded';
-            $booking->booking_status = 'cancelled'; // logical default
-            $booking->save();
-            return;
-        }
-
-        // Case 2 — Fully paid
-        if ($paid >= $total && $total > 0) {
-            $booking->payment_status = 'fully_paid';
-            $booking->save();
-            return;
-        }
-
-        // Case 3 — Partial payment
-        if ($paid > 0) {
-            $booking->payment_status = 'downpayment';
-            $booking->save();
-            return;
-        }
-
-        // Case 4 — No payments
-        $booking->payment_status = 'downpayment';
-        $booking->save();
+        return preg_match('/^RB-[A-Z0-9]{8}$/', $reference) === 1;
     }
 
-    /**
-     * Downpayment rule (editable)
-     * Example: 30%
-     */
-    public static function requiredDownpayment($booking): float
+    public static function isServiceReference(string $reference): bool
     {
-        $total = BookingCalculator::computeTotal($booking);
-        $percentage = 0.30;
-
-        return round($total * $percentage, 2);
+        return preg_match('/^SB-[A-Z0-9]{8}$/', $reference) === 1;
     }
 
-    /**
-     * Check if Stripe payment meets minimum downpayment.
-     */
-    public static function paymentMeetsDownpayment($booking, float $amount): bool
+    public static function detectBookingType(string $reference): ?string
     {
-        return $amount >= self::requiredDownpayment($booking);
+        if (self::isRoomReference($reference)) return 'room';
+        if (self::isServiceReference($reference)) return 'service';
+        return null;
     }
 
-    /**
-     * Find booking via ID (admin-side use)
-     */
-    public static function findBooking(string $type, int $id)
-    {
-        return match ($type) {
-            'room'    => RoomBooking::findOrFail($id),
-            'service' => ServiceBooking::findOrFail($id),
-            default   => null,
-        };
-    }
-
-    /**
-     * Find booking via reference (Stripe-side use)
-     */
+    // Find booking by reference
     public static function findBookingByReference(string $type, string $reference)
     {
+        // Validate reference format
+        if ($type === 'room' && !self::isRoomReference($reference)) {
+            return null;
+        }
+
+        if ($type === 'service' && !self::isServiceReference($reference)) {
+            return null;
+        }
+
         return match ($type) {
             'room'    => RoomBooking::where('reference', $reference)->first(),
             'service' => ServiceBooking::where('reference', $reference)->first(),
@@ -88,9 +44,46 @@ class PaymentService
         };
     }
 
-    /**
-     * Get remaining balance using the new BookingCalculator logic.
-     */
+    // Update booking payment status based on payments
+    public static function updateBookingPaymentStatus($booking): void
+    {
+        $total = BookingCalculator::computeTotal($booking);
+
+        $paid = (float) $booking->totalPaymentsCompleted();
+        $refunded = (float) $booking->totalPaymentsRefunded();
+
+        $netPaid = max(0, $paid - $refunded);
+
+        if ($netPaid == 0 && $refunded > 0) {
+            $booking->payment_status = 'refunded';
+            $booking->save();
+            return;
+        }
+
+        if ($netPaid >= $total && $total > 0) {
+            $booking->payment_status = 'fully_paid';
+            $booking->save();
+            return;
+        }
+
+        if ($netPaid > 0) {
+            $booking->payment_status = 'downpayment';
+            $booking->save();
+            return;
+        }
+
+        $booking->payment_status = 'downpayment';
+        $booking->save();
+    }
+
+    // Downpayment calculation (30%)
+    public static function requiredDownpayment($booking): float
+    {
+        $total = BookingCalculator::computeTotal($booking);
+        return round($total * 0.30, 2);
+    }
+
+    // Remaining balance calculation
     public static function remainingBalance($booking): float
     {
         return BookingCalculator::remainingBalance($booking);

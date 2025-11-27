@@ -24,29 +24,37 @@ class NewRoomBookingNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
-            ->subject('New Room Booking Received')
+        $room = $this->booking->room;
+
+        $mail = (new MailMessage)
+            ->subject('New Room Booking')
             ->greeting('Hello Admin,')
             ->line('A new room booking has been submitted.')
-            ->line('Reference: ' . $this->booking->reference)
-            ->line('Guest Name: ' . $this->booking->guest_name)
-            ->line('Room: ' . optional($this->booking->room)->name) 
-            ->line('Check-in Date: ' . optional($this->booking->check_in_date)->format('M d, Y'))
-            ->line('Check-out Date: ' . optional($this->booking->check_out_date)->format('M d, Y'))
-            ->action('View Booking', url('/admin/room-bookings?reference=' . $this->booking->reference))
-            ->line('Thank you for using the system.');
+            ->line("Reference: {$this->booking->reference}")
+            ->line("Guest Name: {$this->booking->guest_name}")
+            ->line("Room: {$room->name}");
+
+        if ($this->booking->check_in_date) {
+            $mail->line("Check-in: " . $this->booking->check_in_date->format('M d, Y'))
+                 ->line("Check-out: " . $this->booking->check_out_date->format('M d, Y'));
+        } else {
+            $mail->line(
+                "Event Dates: " .
+                $this->booking->event_start_date->format('M d, Y') .
+                " – " .
+                $this->booking->event_end_date->format('M d, Y')
+            );
+        }
+
+        return $mail->action('View Booking List', route('room_booking.index_page'))
+            ->line('Thank you.');
     }
 
     public function toArray(object $notifiable): array
     {
         return [
-            'title'          => 'New Room Booking',
-            'booking_id'     => $this->booking->id,
-            'reference'      => $this->booking->reference,
-            'guest_name'     => $this->booking->guest_name,
-            'room_name'      => optional($this->booking->room)->name, 
-            'check_in_date'  => optional($this->booking->check_in_date)->format('Y-m-d'),
-            'check_out_date' => optional($this->booking->check_out_date)->format('Y-m-d'),
+            'title'     => 'New Room Booking',
+            'reference' => $this->booking->reference,
         ];
     }
 }

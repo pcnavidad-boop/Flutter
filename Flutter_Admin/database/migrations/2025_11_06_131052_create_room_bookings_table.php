@@ -25,21 +25,14 @@ return new class extends Migration
 
             // Booking Details
             $table->integer('number_of_guests')->default(1);
+            $table->date('start_date');
+            $table->date('end_date');
             $table->decimal('total_price', 10, 2)->nullable();
             $table->text('remarks')->nullable();
-
-            // Normal Rooms
-            $table->date('check_in_date')->nullable();
-            $table->date('check_out_date')->nullable();
-
-            // Function Rooms
-            $table->date('event_date')->nullable();
-            $table->time('start_time')->nullable();
-            $table->time('end_time')->nullable();
             
             // Booking Life Cycle
             $table->string('reference')->unique();
-            $table->enum('type', ['website','walk_in','phone','e_mail'])->default('website');
+            $table->enum('type', ['website','walk-in','phone','email'])->default('website');
             $table->date('booking_date');
             $table->enum('booking_status', ['confirmed','checked_in','checked_out','cancelled'])->default('confirmed');
             $table->enum('payment_status', ['downpayment','fully_paid','refunded'])->default('downpayment');
@@ -52,10 +45,10 @@ return new class extends Migration
             $table->index('booking_status');
             $table->index('payment_status');
 
+            $table->index('start_date');
+            $table->index('end_date');
             $table->index('booking_date');
-            $table->index('check_in_date');
-            $table->index('check_out_date');
-            $table->index('event_date');
+            $table->index(['room_id', 'booking_status']);
 
             $table->timestamps();
         });

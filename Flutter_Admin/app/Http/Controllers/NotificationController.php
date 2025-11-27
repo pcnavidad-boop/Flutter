@@ -3,10 +3,11 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Services\PaymentService;
 
 class NotificationController extends Controller
 {
-    // View all notifications
+    // View notifications
     public function index()
     {
         $notifications = auth()->user()
@@ -17,16 +18,18 @@ class NotificationController extends Controller
         return view('notifications.index', compact('notifications'));
     }
 
-    // Fetch unread notifications (for navbar dropdown)
+    // AJAX unread fetch
     public function fetchUnread()
     {
+        $user = auth()->user();
+
         return response()->json([
-            'unread_count' => auth()->user()->unreadNotifications->count(),
-            'notifications' => auth()->user()->unreadNotifications->take(20),
+            'unread_count'  => $user->unreadNotifications->count(),
+            'notifications' => $user->unreadNotifications->take(20),
         ]);
     }
 
-    // Mark a notification as read
+    // Mark one as read
     public function markAsRead($id)
     {
         $notification = auth()->user()
@@ -35,19 +38,17 @@ class NotificationController extends Controller
             ->firstOrFail();
 
         $notification->markAsRead();
-
         return redirect()->back();
     }
 
-    // Mark all notifications as read
+    // Mark all as read
     public function markAllAsRead()
     {
         auth()->user()->unreadNotifications->markAsRead();
-
         return response()->json(['success' => true]);
     }
 
-    // Delete a notification
+    // Delete
     public function destroy($id)
     {
         auth()->user()
@@ -59,7 +60,7 @@ class NotificationController extends Controller
         return redirect()->back()->with('success', 'Notification deleted.');
     }
 
-    // Open a notification and redirect based on its type
+    // Open → redirect to booking page
     public function open($id)
     {
         $notification = auth()->user()
@@ -69,16 +70,25 @@ class NotificationController extends Controller
 
         $notification->markAsRead();
 
-        $data = $notification->data;
+        $data = $notification->data ?? [];
 
-        // Room Booking
-        if ($data['title'] === 'New Room Booking') {
-            return redirect()->route('room_booking.view', $data['booking_id']);
+        if (!isset($data['reference'], $data['title'])) {
+            return redirect()->back()->with('error', 'Invalid notification.');
         }
 
-        // Service Booking
-        if ($data['title'] === 'New Service Booking') {
-            return redirect()->route('service_booking.view', $data['booking_id']);
+        $ref = $data['reference'];
+
+        // Strictly validate reference
+        if (!PaymentService::detectBookingType($ref)) {
+            return redirect()->back()->with('error', 'Invalid booking reference.');
+        }
+
+        if (str_contains(strtolower($data['title']), 'room')) {
+            return redirect()->route('room_booking.index_page', ['ref' => $ref]);
+        }
+
+        if (str_contains(strtolower($data['title']), 'service')) {
+            return redirect()->route('service_booking.index_page', ['ref' => $ref]);
         }
 
         return redirect()->back();

@@ -6,64 +6,87 @@ use Illuminate\Http\Request;
 use Stripe\Stripe;
 use Stripe\Checkout\Session;
 use App\Services\PaymentService;
+use App\Services\BookingCalculator;
 
 class StripeCheckoutController extends Controller
 {
-    /**
-     * Handle clicking "Pay Downpayment"
-     */
+    // Pay downpayment
     public function payDownpayment($reference)
     {
-        $type = $this->detectBookingType($reference);
+        $type = PaymentService::detectBookingType($reference);
+
+        if (!$type) {
+            return back()->with('error', 'Invalid booking reference.');
+        }
+
         $booking = PaymentService::findBookingByReference($type, $reference);
+
+        if (!$booking) {
+            return back()->with('error', 'Booking not found.');
+        }
+
+        if ($booking->payment_status === 'fully_paid') {
+            return back()->with('error', 'This booking is already fully paid.');
+        }
 
         $amount = PaymentService::requiredDownpayment($booking);
 
-        // Prevent paying if already fully paid
-        if (PaymentService::remainingBalance($booking) <= 0) {
-            return back()->with('error', 'This booking is already fully paid.');
-        }
+        // Prevent paying more than remaining balance
+        $remaining = PaymentService::remainingBalance($booking);
+        $amount = min($amount, $remaining);
 
         return $this->startStripeCheckout($booking, $type, $amount);
     }
 
-    /**
-     * Handle clicking "Pay Full Amount"
-     */
+    // Pay full amount
     public function payFull($reference)
     {
-        $type = $this->detectBookingType($reference);
+        $type = PaymentService::detectBookingType($reference);
+
+        if (!$type) {
+            return back()->with('error', 'Invalid booking reference.');
+        }
+
         $booking = PaymentService::findBookingByReference($type, $reference);
 
-        $amount = \App\Services\BookingCalculator::computeTotal($booking);
+        if (!$booking) {
+            return back()->with('error', 'Booking not found.');
+        }
 
-        if (PaymentService::remainingBalance($booking) <= 0) {
+        if ($booking->payment_status === 'fully_paid') {
             return back()->with('error', 'This booking is already fully paid.');
         }
 
-        return $this->startStripeCheckout($booking, $type, $amount);
+        $remaining = PaymentService::remainingBalance($booking);
+
+        return $this->startStripeCheckout($booking, $type, $remaining);
     }
 
-    /**
-     * Handle clicking "Pay Remaining Balance"
-     */
+    // Pay remaining balance
     public function payRemaining($reference)
     {
-        $type = $this->detectBookingType($reference);
+        $type = PaymentService::detectBookingType($reference);
+
+        if (!$type) {
+            return back()->with('error', 'Invalid booking reference.');
+        }
+
         $booking = PaymentService::findBookingByReference($type, $reference);
+
+        if (!$booking) {
+            return back()->with('error', 'Booking not found.');
+        }
 
         $remaining = PaymentService::remainingBalance($booking);
 
         if ($remaining <= 0) {
-            return back()->with('error', 'This booking is already fully paid.');
+            return back()->with('error', 'No remaining balance left.');
         }
 
         return $this->startStripeCheckout($booking, $type, $remaining);
     }
 
-    /**
-     * Create Stripe Checkout session
-     */
+    // Start Stripe Checkout Session
     private function startStripeCheckout($booking, $type, $amount)
     {
         Stripe::setApiKey(config('stripe.secret'));
@@ -77,37 +100,22 @@ class StripeCheckoutController extends Controller
                     'product_data' => [
                         'name' => strtoupper($type) . ' BOOKING PAYMENT',
                     ],
-                    'unit_amount' => $amount * 100,
+                    'unit_amount' => intval($amount * 100),
                 ],
                 'quantity' => 1,
             ]],
 
             'mode' => 'payment',
 
-            'success_url' => url('/payment/success'),
-            'cancel_url'  => url('/payment/cancel'),
+            'success_url' => url("/payment/success?reference={$booking->reference}"),
+            'cancel_url'  => url("/payment/cancel?reference={$booking->reference}"),
 
             'metadata' => [
                 'booking_type'      => $type,
                 'booking_reference' => $booking->reference,
             ],
-
-            'payment_intent_data' => [
-                'metadata' => [
-                    'booking_type'      => $type,
-                    'booking_reference' => $booking->reference,
-                ],
-            ],
         ]);
 
         return redirect($session->url);
-    }
-
-    /**
-     * Determine the booking type based on reference prefix
-     */
-    private function detectBookingType($reference)
-    {
-        return str_starts_with($reference, 'RB-') ? 'room' : 'service';
     }
 }

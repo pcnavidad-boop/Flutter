@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Stripe\Webhook;
-use App\Services\PaymentService;
 use Illuminate\Support\Facades\Log;
+use App\Services\PaymentService;
 use App\Notifications\GuestPaymentReceivedNotification;
 
 class WebhookController extends Controller
@@ -16,7 +16,6 @@ class WebhookController extends Controller
         $signature = $request->header('Stripe-Signature');
 
         try {
-            // Validate Stripe signature
             $event = Webhook::constructEvent(
                 $payload,
                 $signature,
@@ -24,43 +23,53 @@ class WebhookController extends Controller
             );
         } catch (\Exception $e) {
             Log::error("Stripe signature verification failed", [
-                'error' => $e->getMessage(),
+                'error' => $e->getMessage()
             ]);
             return response()->json(['error' => 'Invalid signature'], 400);
         }
 
-        // Only respond to checkout completion
         if ($event->type !== 'checkout.session.completed') {
             return response()->json(['ignored' => true], 200);
         }
 
         $session = $event->data['object'];
 
-        $bookingType = $session['metadata']['booking_type'] ?? null;
-        $reference   = $session['metadata']['booking_reference'] ?? null;
+        // Validate metadata
+        $type = $session['metadata']['booking_type'] ?? null;
+        $reference = $session['metadata']['booking_reference'] ?? null;
 
-        if (!$bookingType || !$reference) {
-            Log::error("Stripe webhook missing metadata", $session);
+        if (!$type || !$reference) {
+            Log::error("Webhook missing metadata", $session);
             return response()->json(['error' => 'Missing metadata'], 400);
         }
 
         // Find booking by reference
-        $booking = PaymentService::findBookingByReference($bookingType, $reference);
+        $booking = PaymentService::findBookingByReference($type, $reference);
 
         if (!$booking) {
-            Log::error("Booking not found via reference", ['reference' => $reference]);
+            Log::error("Booking not found for webhook", ['reference' => $reference]);
             return response()->json(['error' => 'Booking not found'], 404);
         }
 
-        // Amount is in cents
+        // Get amount in PHP format
         $amount = ($session['amount_total'] ?? 0) / 100;
 
-        // Create payment record
+        if ($amount <= 0) {
+            return response()->json(['error' => 'Invalid amount'], 400);
+        }
+
+        // Prevent overpayment
+        $remaining = PaymentService::remainingBalance($booking);
+
+        if ($amount > $remaining) {
+            $amount = $remaining;
+        }
+
+        // Record payment
         $booking->payments()->create([
             'user_id'   => null,
-            'reference' => $session['id'], // Stripe session ID
+            'reference' => $session['id'],
             'amount'    => $amount,
-            'date'      => now(),
             'method'    => 'api',
             'channel'   => 'online',
             'status'    => 'completed',
@@ -69,13 +78,11 @@ class WebhookController extends Controller
         // Update booking payment status
         PaymentService::updateBookingPaymentStatus($booking);
 
-        // Send email to guest
+        // Notify guest
         try {
             $booking->notify(new GuestPaymentReceivedNotification($booking, $amount));
-        } catch (\Exception $e) {
-            Log::error("Failed to send guest payment email", [
-                'error' => $e->getMessage(),
-            ]);
+        } catch (\Throwable $e) {
+            Log::error("Failed to notify guest", ['error' => $e->getMessage()]);
         }
 
         return response()->json(['success' => true]);

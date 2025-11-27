@@ -19,11 +19,12 @@ return new class extends Migration
 
             // Service Identification
             $table->string('name')->unique();
-            $table->text('description')->nullable();
-            $table->string('image')->nullable();
+            $table->enum('service_type', ['restaurant','spa','gym','swimming_pool','bar'])->default('restaurant');
+            $table->text('description');
+            $table->string('image');
 
             // Pricing
-            $table->enum('price_type', ['per_hour', 'per_service', 'per_person'])->default('per_hour');
+            $table->enum('price_type', ['per_hour', 'per_day', 'per_person'])->default('per_hour');
             $table->decimal('base_price', 10, 2)->default(0);
 
             // Capacity
@@ -41,8 +42,9 @@ return new class extends Migration
             $table->string('slug')->unique();
 
             // Indexes
-            $table->index('status');
+            $table->index('service_type');
             $table->index('price_type');
+            $table->index('status');
             $table->index('is_archived');
             $table->index('user_id');
 

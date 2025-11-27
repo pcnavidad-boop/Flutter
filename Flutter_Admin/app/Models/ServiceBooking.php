@@ -15,17 +15,12 @@ class ServiceBooking extends Model
         'guest_name',
         'guest_email',
         'guest_contact',
-        'service_id',
-        'user_id',
+        'number_of_guests',
         'appointment_date',
         'start_time',
         'end_time',
-        'number_of_guests',
-        'total_price',
         'remarks',
-        'reference',
         'type',
-        'booking_date',
         'booking_status',
         'payment_status',
         'status_change_reason',
@@ -33,20 +28,26 @@ class ServiceBooking extends Model
 
     protected $casts = [
         'total_price'      => 'decimal:2',
-        'appointment_date' => 'date',
         'booking_date'     => 'date',
-        'start_time'       => 'datetime:H:i',
-        'end_time'         => 'datetime:H:i',
+        'appointment_date' => 'date',
+        'start_time'       => 'string',
+        'end_time'         => 'string',
     ];
 
+    // Auto-generate reference + booking_date
     protected static function boot()
     {
         parent::boot();
 
         static::creating(function ($booking) {
+            
+            // Booking Reference SB-XXXXXXXX
             if (!$booking->reference) {
                 $booking->reference = 'SB-' . strtoupper(Str::random(8));
             }
+
+            // System-generated (never editable)
+            $booking->booking_date = now();
         });
     }
 
@@ -66,22 +67,7 @@ class ServiceBooking extends Model
         return $this->morphMany(Payment::class, 'payable');
     }
 
-    // Scopes
-    public function scopeConfirmed($query)
-    {
-        return $query->where('booking_status', 'confirmed');
-    }
-
-    public function scopeDownpayment($query)
-    {
-        return $query->where('payment_status', 'downpayment');
-    }
-
-    public function scopeActive($query)
-    {
-        return $query->whereNotIn('booking_status', ['completed', 'cancelled']);
-    }
-
+    // Payment helpers
     public function totalPaymentsCompleted()
     {
         return $this->payments()->where('status', 'completed')->sum('amount');
@@ -92,7 +78,12 @@ class ServiceBooking extends Model
         return $this->payments()->where('status', 'refunded')->sum('amount');
     }
 
-    // Accessors
+    public function getRemainingBalanceAttribute()
+    {
+        return max(0, $this->total_price - $this->totalPaymentsCompleted());
+    }
+
+    // Accessors 
     public function getFormattedPriceAttribute()
     {
         return number_format($this->total_price ?? 0, 2);
@@ -101,7 +92,7 @@ class ServiceBooking extends Model
     public function getServiceScheduleAttribute()
     {
         if (!$this->appointment_date) {
-            return 'No date set';
+            return 'No date selected';
         }
 
         $date = $this->appointment_date->format('M d, Y');
@@ -113,19 +104,16 @@ class ServiceBooking extends Model
         return $date;
     }
 
-    public function getCalculatedTotalAttribute()
-    {
-        return \App\Services\BookingCalculator::computeTotal($this);
-    }
-
-    public function getRemainingBalanceAttribute()
-    {
-        return \App\Services\BookingCalculator::remainingBalance($this);
-    }
-
-    // Notification routing for mail
+    // Notification email routing
     public function routeNotificationForMail(): string
     {
         return $this->guest_email;
     }
+
+    // Appended virtual fields
+    protected $appends = [
+        'formatted_price',
+        'service_schedule',
+        'remaining_balance',
+    ];
 }

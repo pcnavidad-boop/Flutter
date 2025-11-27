@@ -21,11 +21,11 @@ return new class extends Migration
             $table->string('name')->unique();
             $table->string('room_number')->unique();
             $table->enum('room_type', ['single','double','quad','family','suite','penthouse','function'])->default('single');
-            $table->text('description')->nullable();
-            $table->string('image')->nullable();
+            $table->text('description');
+            $table->string('image');
 
             // Pricing
-            $table->enum('price_type', ['per_night','per_hour'])->default('per_night');
+            $table->enum('price_type', ['per_night','per_event_per_day'])->default('per_night');
             $table->decimal('base_price', 10, 2)->default(0);
 
             // Capacity
@@ -43,6 +43,7 @@ return new class extends Migration
 
             // Indexes
             $table->index('room_type');
+            $table->index('price_type');
             $table->index('status');
             $table->index('is_archived');
             $table->index('user_id');

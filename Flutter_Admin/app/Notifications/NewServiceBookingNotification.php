@@ -25,38 +25,33 @@ class NewServiceBookingNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('New Service Booking Received')
+            ->subject('New Service Booking')
             ->greeting('Hello Admin,')
             ->line('A new service booking has been submitted.')
-            ->line('Reference: ' . $this->booking->reference)
-            ->line('Guest Name: ' . $this->booking->guest_name)
-            ->line('Service: ' . optional($this->booking->service)->name)
-            ->line('Appointment Date: ' . optional($this->booking->appointment_date)->format('M d, Y'))
-            ->line('Time: ' . $this->formatTimeRange())
-            ->action('View Booking', url('/admin/service-bookings?reference=' . $this->booking->reference))
-            ->line('Please check the booking as soon as possible.');
+            ->line("Reference: {$this->booking->reference}")
+            ->line("Guest Name: {$this->booking->guest_name}")
+            ->line("Service: {$this->booking->service->name}")
+            ->line("Appointment Date: " . $this->booking->appointment_date->format('M d, Y'))
+            ->line("Time: " . $this->formatTimeRange())
+            ->action('View Booking List', route('service_booking.index_page'));
     }
 
     public function toArray(object $notifiable): array
     {
         return [
-            'title'           => 'New Service Booking',
-            'booking_id'      => $this->booking->id,
-            'reference'       => $this->booking->reference,
-            'guest_name'      => $this->booking->guest_name,
-            'service_name'    => optional($this->booking->service)->name,
-            'appointment_date'=> optional($this->booking->appointment_date)->format('Y-m-d'),
-            'start_time'      => $this->booking->start_time,
-            'end_time'        => $this->booking->end_time,
+            'title'     => 'New Service Booking',
+            'reference' => $this->booking->reference,
         ];
     }
 
-    private function formatTimeRange()
+    private function formatTimeRange(): string
     {
         if (!$this->booking->start_time || !$this->booking->end_time) {
             return 'N/A';
         }
 
-        return $this->booking->start_time . ' - ' . $this->booking->end_time;
+        return date('h:i A', strtotime($this->booking->start_time))
+             . ' – '
+             . date('h:i A', strtotime($this->booking->end_time));
     }
 }

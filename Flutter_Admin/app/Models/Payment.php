@@ -11,15 +11,11 @@ class Payment extends Model
     use HasFactory;
 
     protected $fillable = [
-        'payable_id',
-        'payable_type',
-        'user_id',
-        'reference',
         'amount',
-        'date',
         'method',
-        'channel',
         'status',
+        'user_id',
+        'channel',
     ];
 
     protected $casts = [
@@ -27,18 +23,33 @@ class Payment extends Model
         'date'   => 'date',
     ];
 
+    // Auto-generate reference, date, channel
     protected static function boot()
     {
         parent::boot();
 
         static::creating(function ($payment) {
-            if (!$payment->reference) {
-                $payment->reference = 'OFF-' . strtoupper(Str::random(10));
+
+            // Random unique reference
+            do {
+                $ref = 'PAY-' . strtoupper(Str::random(10));
+            } while (Payment::where('reference', $ref)->exists());
+
+            $payment->reference = $ref;
+
+            // System-generated date
+            if (!$payment->date) {
+                $payment->date = now()->toDateString();
+            }
+
+            // Default channel
+            if (!$payment->channel) {
+                $payment->channel = 'offline';
             }
         });
     }
 
-    // Relationships
+    // Polymorphic Relationship
     public function payable()
     {
         return $this->morphTo();
@@ -60,16 +71,6 @@ class Payment extends Model
         return $query->where('status', 'refunded');
     }
 
-    public function scopeOnline($query)
-    {
-        return $query->where('channel', 'online');
-    }
-    
-    public function scopeByMethod($query, $method)
-    {
-        return $query->where('method', $method);
-    }
-
     // Accessors
     public function getFormattedAmountAttribute()
     {
@@ -80,4 +81,15 @@ class Payment extends Model
     {
         return $this->date ? $this->date->format('M d, Y') : null;
     }
+
+    public function getPaymentLabelAttribute()
+    {
+        return "{$this->formatted_amount} ({$this->method})";
+    }
+
+    protected $appends = [
+        'formatted_amount',
+        'formatted_date',
+        'payment_label',
+    ];
 }

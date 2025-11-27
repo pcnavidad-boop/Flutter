@@ -18,7 +18,7 @@ return new class extends Migration
             $table->morphs('payable'); 
 
             // Payment Details
-            $table->string('reference')->nullable()->unique();
+            $table->string('reference')->unique();
             $table->decimal('amount', 10, 2);
             $table->date('date');
             $table->enum('method', ['api', 'cash', 'card', 'bank_transfer', 'e_wallet'])->default('cash');

@@ -24,10 +24,10 @@ return new class extends Migration
             $table->string('guest_contact')->nullable();
         
             // Booking Details
+            $table->integer('number_of_guests')->default(1);
             $table->date('appointment_date');
             $table->time('start_time')->nullable();
             $table->time('end_time')->nullable();
-            $table->integer('number_of_guests')->default(1);
             $table->decimal('total_price', 10, 2)->nullable();
             $table->text('remarks')->nullable();
 

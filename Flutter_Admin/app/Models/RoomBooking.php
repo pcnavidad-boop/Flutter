@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Str;
 use Illuminate\Notifications\Notifiable;
+use Carbon\Carbon;
 
 class RoomBooking extends Model
 {
@@ -15,42 +16,38 @@ class RoomBooking extends Model
         'guest_name',
         'guest_email',
         'guest_contact',
-        'check_in_date',
-        'check_out_date',
         'number_of_guests',
-        'event_date',
-        'start_time',
-        'end_time',
-        'room_id',
-        'user_id',
-        'total_price',
+        'start_date',
+        'end_date',
         'remarks',
-        'reference',
         'type',
-        'booking_date',
         'booking_status',
         'payment_status',
         'status_change_reason',
     ];
 
     protected $casts = [
-        'total_price'    => 'decimal:2',
-        'check_in_date'  => 'date',
-        'check_out_date' => 'date',
-        'event_date'     => 'date',
-        'start_time'     => 'datetime:H:i',
-        'end_time'       => 'datetime:H:i',
-        'booking_date'   => 'date',
+        'total_price'   => 'decimal:2',
+        'booking_date'  => 'date',
+
+        'start_date'    => 'date',
+        'end_date'      => 'date',
     ];
 
+    // Auto-generate reference + booking_date
     protected static function boot()
     {
         parent::boot();
 
         static::creating(function ($booking) {
+
+            // Booking Reference RB-XXXXXXXX
             if (!$booking->reference) {
                 $booking->reference = 'RB-' . strtoupper(Str::random(8));
             }
+
+            // System-generated (never editable)
+            $booking->booking_date = now();
         });
     }
 
@@ -70,66 +67,62 @@ class RoomBooking extends Model
         return $this->morphMany(Payment::class, 'payable');
     }
 
-    // Scopes
-    public function scopeConfirmed($query)
-    {
-        return $query->where('booking_status', 'confirmed');
-    }
-
-    public function scopeDownpayment($query)
-    {
-        return $query->where('payment_status', 'downpayment');
-    }
-
-    public function scopeActive($query)
-    {
-        return $query->whereNotIn('booking_status', ['checked_out', 'cancelled']);
-    }
-
+    // Payment helpers
     public function totalPaymentsCompleted()
     {
-        return $this->payments()->where('status', 'completed')->sum('amount');
+        return $this->payments()
+            ->where('status', 'completed')
+            ->sum('amount');
     }
 
     public function totalPaymentsRefunded()
     {
-        return $this->payments()->where('status', 'refunded')->sum('amount');
+        return $this->payments()
+            ->where('status', 'refunded')
+            ->sum('amount');
+    }
+
+    public function getRemainingBalanceAttribute()
+    {
+        return max(0, $this->total_price - $this->totalPaymentsCompleted());
     }
 
     // Accessors
-    public function getFormattedPriceAttribute()
+    public function getPeriodAttribute()
     {
-        return number_format($this->total_price ?? 0, 2);
-    }
-
-    public function getStayPeriodAttribute()
-    {
-        if ($this->check_in_date && $this->check_out_date) {
-            return $this->check_in_date->format('M d, Y') . ' - ' . $this->check_out_date->format('M d, Y');
-        }
-
-        if ($this->event_date) {
-            return $this->event_date->format('M d, Y');
+        if ($this->start_date && $this->end_date) {
+            return $this->start_date->format('M d, Y') . " - " . $this->end_date->format('M d, Y');
         }
 
         return null;
     }
 
-    public function getCalculatedTotalAttribute()
+    public function getScheduleDisplayAttribute()
     {
-        return \App\Services\BookingCalculator::computeTotal($this);
+        return $this->period;
     }
 
-    public function getRemainingBalanceAttribute()
+    public function getIsFunctionBookingAttribute()
     {
-        return \App\Services\BookingCalculator::remainingBalance($this);
+        return $this->room && $this->room->room_type === 'function';
     }
 
-    // Notification routing for mail
+    public function getIsStayBookingAttribute()
+    {
+        return $this->room && $this->room->room_type !== 'function';
+    }
+
+    // Notification email routing
     public function routeNotificationForMail(): string
     {
         return $this->guest_email;
     }
-    
-}
 
+    // Appended virtual fields
+    protected $appends = [
+        'period',
+        'schedule_display',
+        'is_function_booking',
+        'is_stay_booking',
+    ];
+}
