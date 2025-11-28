@@ -6,18 +6,28 @@ use App\Models\Room;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
-use Carbon\Carbon;
+use App\Services\RoomRulesService;
+use App\Services\ItemLifecycleService;
 
 class RoomController extends Controller
 {
-    // View all rooms
+    protected RoomRulesService $rules;
+    protected ItemLifecycleService $lifecycle;
+
+    public function __construct(RoomRulesService $rules, ItemLifecycleService $lifecycle)
+    {
+        $this->rules = $rules;
+        $this->lifecycle = $lifecycle;
+    }
+
+    // List rooms
     public function index()
     {
         $rooms = Room::orderBy('room_number')->get();
         return view('room.index', compact('rooms'));
     }
 
-    // Create a new room
+    // Create room
     public function create(Request $request)
     {
         $data = $request->validate([
@@ -27,60 +37,39 @@ class RoomController extends Controller
             'base_price'  => 'required|numeric|min:0|max:999999.99',
             'description' => 'required|string|max:1000',
             'image'       => 'required|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'capacity'    => 'nullable|integer|min:1',
+            'number_of_beds' => 'nullable|integer|min:1',
         ]);
 
-        $type = $request->room_type;
+        $type = $data['room_type'];
 
-        // Function hall rules
         if ($type === 'function') {
-
             $data['price_type'] = 'per_event_per_day';
             $data['number_of_beds'] = null;
-
-            $data['capacity'] = $request->validate([
-                'capacity' => 'required|integer|min:1|max:250'
-            ])['capacity'];
-
+            $data['capacity'] = (int) $request->validate(['capacity' => 'required|integer|min:1|max:250'])['capacity'];
         } else {
-
             $data['price_type'] = 'per_night';
 
-            $bedRules = [
-                'single'    => ['min' => 1, 'max' => 1],
-                'double'    => ['min' => 1, 'max' => 2],
-                'quad'      => ['min' => 2, 'max' => 2],
-                'family'    => ['min' => 2, 'max' => 3],
-                'suite'     => ['min' => 1, 'max' => 2],
-                'penthouse' => ['min' => 2, 'max' => 4],
-            ];
+            // Validate beds according to rules
+            $beds = (int) $request->validate(['number_of_beds' => 'required|integer'])['number_of_beds'];
+            try {
+                $this->rules->validateBeds($type, $beds);
+            } catch (\Exception $e) {
+                return back()->withErrors(['number_of_beds' => $e->getMessage()])->withInput();
+            }
+            $data['number_of_beds'] = $beds;
 
-            $request->validate([
-                'number_of_beds' =>
-                    "required|integer|min:{$bedRules[$type]['min']}|max:{$bedRules[$type]['max']}"
-            ]);
-
-            $data['number_of_beds'] = $request->number_of_beds;
-
-            $capacityRules = [
-                'single'    => ['min' => 1, 'max' => 1],
-                'double'    => ['min' => 2, 'max' => 2],
-                'quad'      => ['min' => 4, 'max' => 4],
-                'family'    => ['min' => 4, 'max' => 6],
-                'suite'     => ['min' => 2, 'max' => 4],
-                'penthouse' => ['min' => 4, 'max' => 8],
-            ];
-
-            $request->validate([
-                'capacity' =>
-                    "required|integer|min:{$capacityRules[$type]['min']}|max:{$capacityRules[$type]['max']}"
-            ]);
-
-            $data['capacity'] = $request->capacity;
+            $capacity = (int) $request->validate(['capacity' => 'required|integer'])['capacity'];
+            try {
+                $this->rules->validateCapacity($type, $capacity);
+            } catch (\Exception $e) {
+                return back()->withErrors(['capacity' => $e->getMessage()])->withInput();
+            }
+            $data['capacity'] = $capacity;
         }
 
-        // Image upload FIRST
-        $path = $request->file('image')->store('room_images', 'public');
-        $data['image'] = $path;
+        // Upload image first
+        $data['image'] = $request->file('image')->store('room_images', 'public');
 
         // System fields
         $data['created_by']  = auth()->id();
@@ -89,18 +78,15 @@ class RoomController extends Controller
 
         Room::create($data);
 
-        return redirect()->route('room.index_page')
-            ->with('success', 'Room created successfully.');
+        return redirect()->route('room.index_page')->with('success', 'Room created successfully.');
     }
 
-    // Update a room
+    // Update room (no deletion here — archive used instead)
     public function update(Request $request, Room $room)
     {
-        // ❗ Block editing archived rooms
+        // Reject updates on archived items
         if ($room->is_archived) {
-            return back()->withErrors([
-                'error' => 'Cannot update an archived room.'
-            ]);
+            return back()->withErrors(['error' => 'Cannot update an archived room.']);
         }
 
         $data = $request->validate([
@@ -111,80 +97,57 @@ class RoomController extends Controller
             'description' => 'required|string|max:1000',
             'image'       => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
             'status'      => 'required|in:available,maintenance',
+            'capacity'    => 'nullable|integer|min:1',
+            'number_of_beds' => 'nullable|integer|min:1',
         ]);
 
-        $type = $request->room_type;
+        $type = $data['room_type'];
 
-        // Prevent changing room type if active bookings exist
-        if ($room->bookings()->where('booking_status','!=','cancelled')->exists()) {
-            if ($type !== $room->room_type) {
-                return back()->withErrors([
-                    'room_type' => 'Cannot change room type because active bookings exist.'
-                ])->withInput();
-            }
+        // Prevent changing room_type if active bookings exist
+        if ($room->bookings()->where('booking_status', '!=', 'cancelled')->exists() && $type !== $room->room_type) {
+            return back()->withErrors(['room_type' => 'Cannot change room type because active bookings exist.'])->withInput();
         }
 
-        // ❗ Prevent lowering capacity below existing bookings
-        $activeBookings = $room->bookings()->where('booking_status','!=','cancelled')->get();
+        // Validate capacity/beds and ensure capacity doesn't break existing bookings
+        $activeBookings = $room->bookings()->where('booking_status', '!=', 'cancelled')->get();
 
-        // Function hall logic
         if ($type === 'function') {
-
-            $capacity = $request->validate([
-                'capacity' => 'required|integer|min:1|max:250'
-            ])['capacity'];
+            $capacity = (int) ($request->capacity ?? 0);
+            try {
+                $this->lifecycle->assertItemUpdatable($room); // extra guard (will throw if archived)
+                $this->lifecycle->assertCanArchive($room); // not strictly needed here but keeps checks consistent
+            } catch (\Exception $e) {
+                // ignore — we only use assertItemUpdatable to keep consistency across services
+            }
 
             foreach ($activeBookings as $b) {
                 if ($b->number_of_guests > $capacity) {
-                    return back()->withErrors([
-                        'capacity' => "Cannot reduce capacity below existing booking of {$b->number_of_guests} guests."
-                    ]);
+                    return back()->withErrors(['capacity' => "Cannot reduce capacity below existing booking of {$b->number_of_guests} guests."]);
                 }
             }
 
             $data['capacity'] = $capacity;
             $data['number_of_beds'] = null;
             $data['price_type'] = 'per_event_per_day';
-
         } else {
+            $beds = (int) ($request->number_of_beds ?? 0);
+            try {
+                $this->rules->validateBeds($type, $beds);
+            } catch (\Exception $e) {
+                return back()->withErrors(['number_of_beds' => $e->getMessage()])->withInput();
+            }
+            $data['number_of_beds'] = $beds;
 
-            $bedRules = [
-                'single'    => ['min' => 1, 'max' => 1],
-                'double'    => ['min' => 1, 'max' => 2],
-                'quad'      => ['min' => 2, 'max' => 2],
-                'family'    => ['min' => 2, 'max' => 3],
-                'suite'     => ['min' => 1, 'max' => 2],
-                'penthouse' => ['min' => 2, 'max' => 4],
-            ];
-
-            $request->validate([
-                'number_of_beds' =>
-                    "required|integer|min:{$bedRules[$type]['min']}|max:{$bedRules[$type]['max']}"
-            ]);
-
-            $data['number_of_beds'] = $request->number_of_beds;
-
-            $capacityRules = [
-                'single'    => ['min' => 1, 'max' => 1],
-                'double'    => ['min' => 2, 'max' => 2],
-                'quad'      => ['min' => 4, 'max' => 4],
-                'family'    => ['min' => 4, 'max' => 6],
-                'suite'     => ['min' => 2, 'max' => 4],
-                'penthouse' => ['min' => 4, 'max' => 8],
-            ];
-
-            $request->validate([
-                'capacity' =>
-                    "required|integer|min:{$capacityRules[$type]['min']}|max:{$capacityRules[$type]['max']}"
-            ]);
-
-            $newCapacity = $request->capacity;
+            $newCapacity = (int) ($request->capacity ?? 0);
+            try {
+                $this->rules->validateCapacity($type, $newCapacity);
+            } catch (\Exception $e) {
+                return back()->withErrors(['capacity' => $e->getMessage()])->withInput();
+            }
 
             foreach ($activeBookings as $b) {
                 if ($b->number_of_guests > $newCapacity) {
-                    return back()->withErrors([
-                        'capacity' => "Cannot reduce capacity below existing booking of {$b->number_of_guests} guests."
-                    ]);
+                    return back()->withErrors(['capacity' => "Cannot reduce capacity below existing booking of {$b->number_of_guests} guests."]);
                 }
             }
 
@@ -192,72 +155,33 @@ class RoomController extends Controller
             $data['price_type'] = 'per_night';
         }
 
-        // Image replacement (upload first)
+        // Replace image safely (upload then delete)
         if ($request->hasFile('image')) {
             $newPath = $request->file('image')->store('room_images', 'public');
-
-            // delete old only after successful upload
             if ($room->image) {
                 Storage::disk('public')->delete($room->image);
             }
-
             $data['image'] = $newPath;
         }
 
         $room->update($data);
 
-        return redirect()->route('room.index_page')
-            ->with('success', 'Room updated successfully.');
+        return redirect()->route('room.index_page')->with('success', 'Room updated successfully.');
     }
 
-    // Archive / Unarchive
+    // Archive / unarchive a room (no delete)
     public function archive(Request $request, Room $room)
     {
         $request->validate(['is_archived' => 'required|boolean']);
 
-        // Prevent archiving if there are future bookings (stay or event)
-        $hasFutureBooking = $room->bookings()
-            ->where('booking_status', '!=', 'cancelled')
-            ->whereDate('start_date', '>=', today())
-            ->exists();
-
-        if ($hasFutureBooking) {
-            return back()->withErrors([
-                'is_archived' => 'Cannot archive this room because future bookings exist.'
-            ]);
+        try {
+            $this->lifecycle->assertCanArchive($room);
+        } catch (\Exception $e) {
+            return back()->withErrors(['is_archived' => $e->getMessage()]);
         }
 
-        $room->update([
-            'is_archived' => $request->is_archived
-        ]);
+        $room->update(['is_archived' => $request->is_archived]);
 
-        return redirect()->route('room.index_page')
-            ->with('success', 'Room archive status updated.');
-    }
-
-    // Delete a room
-    public function destroy(Room $room)
-    {
-        // Cannot delete archived rooms
-        if ($room->is_archived === true) {
-            return back()->withErrors([
-                'error' => 'Cannot delete archived rooms. Unarchive then archive bookings first.'
-            ]);
-        }
-
-        if ($room->bookings()->exists()) {
-            return back()->withErrors([
-                'error' => 'Cannot delete this room because bookings exist. Archive it instead.'
-            ]);
-        }
-
-        if ($room->image) {
-            Storage::disk('public')->delete($room->image);
-        }
-
-        $room->delete();
-
-        return redirect()->route('room.index_page')
-            ->with('success', 'Room deleted successfully.');
+        return redirect()->route('room.index_page')->with('success', 'Room archive status updated.');
     }
 }

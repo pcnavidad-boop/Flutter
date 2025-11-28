@@ -6,12 +6,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Str;
 use Illuminate\Notifications\Notifiable;
+use App\Services\BookingCalculator;
 
 class ServiceBooking extends Model
 {
     use HasFactory, Notifiable;
 
     protected $fillable = [
+        'reference',
         'guest_name',
         'guest_email',
         'guest_contact',
@@ -36,17 +38,23 @@ class ServiceBooking extends Model
         'end_time'         => 'string',
     ];
 
-    // Auto-generate reference + booking_date
     protected static function boot()
     {
         parent::boot();
 
-        static::creating(function ($booking) {
-            if (!$booking->reference) {
-                $booking->reference = 'SB-' . strtoupper(Str::random(8));
-            }
-            $booking->booking_date = now();
+        static::creating(function ($b) {
+            $b->reference = self::uniqueReference();
+            $b->booking_date = now();
         });
+    }
+
+    private static function uniqueReference(): string
+    {
+        do {
+            $ref = 'SB-' . strtoupper(Str::random(8));
+        } while (self::where('reference', $ref)->exists());
+
+        return $ref;
     }
 
     // Relationships
@@ -65,7 +73,7 @@ class ServiceBooking extends Model
         return $this->morphMany(Payment::class, 'payable');
     }
 
-    // Scopes and Calculated Attributes
+    // Payment calculations
     public function totalPaymentsCompleted()
     {
         return $this->payments()->where('status', 'completed')->sum('amount');
@@ -78,7 +86,7 @@ class ServiceBooking extends Model
 
     public function getRemainingBalanceAttribute()
     {
-        return max(0, $this->total_price - $this->totalPaymentsCompleted());
+        return BookingCalculator::remainingBalance($this);
     }
 
     // Accessors
@@ -89,26 +97,22 @@ class ServiceBooking extends Model
 
     public function getServiceScheduleAttribute()
     {
-        if (!$this->appointment_date) {
-            return 'No date selected';
-        }
+        if (!$this->appointment_date) return 'No date selected';
 
         $date = $this->appointment_date->format('M d, Y');
 
         if ($this->start_time && $this->end_time) {
-            return "{$date} ({$this->start_time} - {$this->end_time})";
+            return "{$date} ({$this->start_time->format('H:i')} - {$this->end_time->format('H:i')})";
         }
 
         return $date;
     }
 
-    // Notification Routing
     public function routeNotificationForMail(): string
     {
         return $this->guest_email;
     }
 
-    // Appended attributes
     protected $appends = [
         'formatted_price',
         'service_schedule',

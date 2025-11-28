@@ -34,20 +34,24 @@ class Service extends Model
         'end_time'    => 'string',
     ];
 
-    // Auto-generate & update slugs
     protected static function boot()
     {
         parent::boot();
 
         static::creating(function ($service) {
-            $service->slug = Str::slug($service->name . '-' . uniqid());
+            $service->slug = self::uniqueSlug($service->name);
         });
 
         static::updating(function ($service) {
             if ($service->isDirty('name')) {
-                $service->slug = Str::slug($service->name . '-' . uniqid());
+                $service->slug = self::uniqueSlug($service->name);
             }
         });
+    }
+
+    private static function uniqueSlug(string $name): string
+    {
+        return Str::slug($name . '-' . Str::random(6));
     }
 
     public function getRouteKeyName()
@@ -67,23 +71,23 @@ class Service extends Model
     }
 
     // Scopes
-    public function scopeAvailable($query)
+    public function scopeAvailable($q)
     {
-        return $query->where('status', 'available');
+        return $q->where('status', 'available');
     }
 
-    public function scopeActive($query)
+    public function scopeActive($q)
     {
-        return $query->where('is_archived', false);
+        return $q->where('is_archived', false);
     }
 
-    // Accessors
+    // Mutators
     public function setNameAttribute($value)
     {
         $this->attributes['name'] = ucwords(strtolower($value));
     }
 
-    // Mutators
+    // Accessors
     public function getFormattedPriceAttribute()
     {
         return number_format($this->base_price, 2);
@@ -91,9 +95,8 @@ class Service extends Model
 
     public function getScheduleAttribute()
     {
-        return $this->start_time && $this->end_time
-            ? substr($this->start_time, 0, 5) . ' - ' . substr($this->end_time, 0, 5)
-            : null;
+        if (!$this->start_time || !$this->end_time) return null;
+        return $this->start_time->format('H:i') . ' - ' . $this->end_time->format('H:i');
     }
 
     public function getPriceLabelAttribute()
@@ -106,7 +109,6 @@ class Service extends Model
         };
     }
 
-    // Appended attributes
     protected $appends = [
         'formatted_price',
         'schedule',

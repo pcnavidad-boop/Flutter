@@ -6,28 +6,34 @@ use App\Models\Service;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use App\Services\ServiceRulesService;
+use App\Services\ItemLifecycleService;
 use Carbon\Carbon;
 
 class ServiceController extends Controller
 {
-    // View all services
+    protected ServiceRulesService $rules;
+    protected ItemLifecycleService $lifecycle;
+
+    public function __construct(ServiceRulesService $rules, ItemLifecycleService $lifecycle)
+    {
+        $this->rules = $rules;
+        $this->lifecycle = $lifecycle;
+    }
+
+    // List services
     public function index()
     {
         $services = Service::orderBy('name')->get();
         return view('service.index', compact('services'));
     }
 
-    // Create a new service
+    // Create service
     public function create(Request $request)
     {
         $data = $request->validate([
-            'name'         => [
-                'required','string','max:255',
-                Rule::unique('services','name')->where(function($q){
-                    return $q->where('is_archived', false);
-                })
-            ],
-            'service_type' => ['required', Rule::in(['restaurant','spa','gym','swimming_pool','bar'])],
+            'name'         => ['required','string','max:255', Rule::unique('services','name')->where(fn($q) => $q->where('is_archived', false))],
+            'service_type' => 'required|in:restaurant,spa,gym,swimming_pool,bar',
             'description'  => 'required|string|max:1000',
             'location'     => 'required|string|max:255',
             'capacity'     => 'nullable|integer|min:1',
@@ -37,60 +43,38 @@ class ServiceController extends Controller
             'image'        => 'required|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
 
-        // Price type rules
-        $priceMap = [
-            'restaurant'     => 'per_person',
-            'bar'            => 'per_person',
-            'spa'            => 'per_hour',
-            'gym'            => 'per_day',
-            'swimming_pool'  => 'per_day',
-        ];
-
-        $data['price_type'] = $priceMap[$request->service_type];
-
-        // Capacity rules
-        $capacityRequired = in_array($request->service_type, ['restaurant','bar','spa']);
-
-        if ($capacityRequired) {
-            $request->validate(['capacity' => 'required|integer|min:1']);
-            $data['capacity'] = $request->capacity;
-        } else {
-            // For gym/pool, default capacity > 1 makes sense
-            $data['capacity'] = $request->capacity ?: 20;
+        // Determine price type and validated capacity
+        $data['price_type'] = $this->rules->determinePriceType($data['service_type']);
+        try {
+            $data['capacity'] = $this->rules->validateCapacity($data['service_type'], $request->capacity ?? null);
+            $this->rules->validateOperatingHours($data['start_time'], $data['end_time']);
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => $e->getMessage()])->withInput();
         }
 
-        // Image upload
+        // Upload image
         $data['image'] = $request->file('image')->store('service_images', 'public');
 
         // System fields
-        $data['created_by'] = auth()->id();
-        $data['status']     = 'available';
+        $data['created_by']  = auth()->id();
+        $data['status']      = 'available';
         $data['is_archived'] = false;
 
         Service::create($data);
 
-        return redirect()->route('service.index_page')
-            ->with('success', 'Service created successfully.');
+        return redirect()->route('service.index_page')->with('success', 'Service created successfully.');
     }
 
-    // Update a service
+    // Update service
     public function update(Request $request, Service $service)
     {
-        // ❗ Prevent updating archived service (same rule as Rooms)
         if ($service->is_archived) {
-            return back()->withErrors([
-                'error' => 'Archived services cannot be modified.'
-            ]);
+            return back()->withErrors(['error' => 'Cannot update an archived service.']);
         }
 
         $data = $request->validate([
-            'name'         => [
-                'required','string','max:255',
-                Rule::unique('services','name')
-                    ->where(fn($q) => $q->where('is_archived', false))
-                    ->ignore($service->id)
-            ],
-            'service_type' => ['required', Rule::in(['restaurant','spa','gym','swimming_pool','bar'])],
+            'name'         => ['required','string','max:255', Rule::unique('services','name')->where(fn($q) => $q->where('is_archived', false))->ignore($service->id)],
+            'service_type' => 'required|in:restaurant,spa,gym,swimming_pool,bar',
             'description'  => 'required|string|max:1000',
             'location'     => 'required|string|max:255',
             'capacity'     => 'nullable|integer|min:1',
@@ -101,142 +85,74 @@ class ServiceController extends Controller
             'status'       => 'required|in:available,maintenance',
         ]);
 
-        // ❗ Prevent changing service_type if bookings exist
-        if ($service->bookings()->where('booking_status', '!=', 'cancelled')->exists()) {
-            if ($request->service_type !== $service->service_type) {
-                return back()->withErrors([
-                    'service_type' => 'Cannot change service type while bookings exist.'
-                ]);
-            }
+        // Prevent changing service type when active bookings exist
+        if ($service->bookings()->where('booking_status','!=','cancelled')->exists() && $data['service_type'] !== $service->service_type) {
+            return back()->withErrors(['service_type' => 'Cannot change service type while bookings exist.']);
         }
 
-        // ❗ Prevent setting maintenance if active bookings exist
-        if ($request->status === 'maintenance' &&
-            $service->bookings()->where('booking_status','!=','cancelled')->exists()) {
-
-            return back()->withErrors([
-                'status' => 'Cannot put service under maintenance because active bookings exist.'
-            ]);
+        // Prevent putting to maintenance if active bookings exist
+        if ($data['status'] === 'maintenance' && $service->bookings()->where('booking_status','!=','cancelled')->exists()) {
+            return back()->withErrors(['status' => 'Cannot place service under maintenance while bookings exist.']);
         }
 
-        // Validate new operating hours against existing bookings
-        $existingBookings = $service->bookings()
-            ->where('booking_status', '!=', 'cancelled')
-            ->get();
+        // Validate capacity and operating hours against existing bookings
+        $existingBookings = $service->bookings()->where('booking_status','!=','cancelled')->get();
 
-        foreach ($existingBookings as $b) {
+        try {
+            // price type + capacity validation
+            $data['price_type'] = $this->rules->determinePriceType($data['service_type']);
+            $data['capacity'] = $this->rules->validateCapacity($data['service_type'], $request->capacity ?? $service->capacity);
+            $this->rules->validateOperatingHours($data['start_time'], $data['end_time']);
 
-            $reqStart = Carbon::parse($data['start_time']);
-            $reqEnd   = Carbon::parse($data['end_time']);
-
-            $bStart   = Carbon::parse($b->start_time);
-            $bEnd     = Carbon::parse($b->end_time);
-
-            if ($bStart->lt($reqStart) || $bEnd->gt($reqEnd)) {
-                return back()->withErrors([
-                    'start_time' =>
-                        "Cannot change operating hours: existing bookings fall outside the new schedule."
-                ]);
-            }
-        }
-
-        // Price type auto-set
-        $priceMap = [
-            'restaurant'     => 'per_person',
-            'bar'            => 'per_person',
-            'spa'            => 'per_hour',
-            'gym'            => 'per_day',
-            'swimming_pool'  => 'per_day',
-        ];
-
-        $data['price_type'] = $priceMap[$request->service_type];
-
-        // Capacity rules
-        $capacityRequired = in_array($request->service_type, ['restaurant','bar','spa']);
-
-        if ($capacityRequired) {
-
-            // Cannot reduce capacity below booked guest count
+            // Verify capacity doesn't break any existing booking
             foreach ($existingBookings as $b) {
-                if ($b->number_of_guests > $request->capacity) {
-                    return back()->withErrors([
-                        'capacity' =>
-                            "Cannot set capacity lower than existing bookings ({$b->number_of_guests} guests)."
-                    ]);
+                if ($b->number_of_guests > $data['capacity']) {
+                    return back()->withErrors(['capacity' => "Cannot reduce capacity below existing booking of {$b->number_of_guests} guests."]);
                 }
             }
 
-            $request->validate(['capacity' => 'required|integer|min:1']);
-            $data['capacity'] = $request->capacity;
+            // Verify operating hours won't leave bookings outside schedule
+            foreach ($existingBookings as $b) {
+                $reqStart = \Carbon\Carbon::parse($data['start_time']);
+                $reqEnd   = \Carbon\Carbon::parse($data['end_time']);
+                $bStart   = \Carbon\Carbon::parse($b->start_time);
+                $bEnd     = \Carbon\Carbon::parse($b->end_time);
 
-        } else {
-            $data['capacity'] = $request->capacity ?: 20;
+                if ($bStart->lt($reqStart) || $bEnd->gt($reqEnd)) {
+                    return back()->withErrors(['start_time' => "Cannot change operating hours: existing booking at {$b->start_time}-{$b->end_time} would be outside new hours."]);
+                }
+            }
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => $e->getMessage()])->withInput();
         }
 
-        // Image replacement
+        // Replace image safely
         if ($request->hasFile('image')) {
+            $new = $request->file('image')->store('service_images', 'public');
             if ($service->image) {
                 Storage::disk('public')->delete($service->image);
             }
-            $data['image'] = $request->file('image')->store('service_images', 'public');
+            $data['image'] = $new;
         }
 
         $service->update($data);
 
-        return redirect()->route('service.index_page')
-            ->with('success', 'Service updated successfully.');
+        return redirect()->route('service.index_page')->with('success', 'Service updated successfully.');
     }
 
-    // Archive / Unarchive
+    // Archive / unarchive (no delete)
     public function archive(Request $request, Service $service)
     {
         $request->validate(['is_archived' => 'required|boolean']);
 
-        // ❗ Prevent archiving if the service has **future** bookings
-        $hasFuture = $service->bookings()
-            ->where('booking_status','!=','cancelled')
-            ->where('appointment_date','>=',today())
-            ->exists();
-
-        if ($hasFuture) {
-            return back()->withErrors([
-                'error' => 'Cannot archive a service with future bookings.'
-            ]);
+        try {
+            $this->lifecycle->assertCanArchive($service);
+        } catch (\Exception $e) {
+            return back()->withErrors(['is_archived' => $e->getMessage()]);
         }
 
         $service->update(['is_archived' => $request->is_archived]);
 
-        return redirect()->route('service.index_page')
-            ->with('success', 'Service archive status updated.');
-    }
-
-    // Delete a service
-    public function destroy(Service $service)
-    {
-        // ❗ Cannot delete unless archived first
-        if (!$service->is_archived) {
-            return back()->withErrors([
-                'error' => 'You must archive this service before deleting it.'
-            ]);
-        }
-
-        // ❗ Prevent deletion if any bookings exist (past or future)
-        if ($service->bookings()->exists()) {
-            return back()->withErrors([
-                'error' => 'Cannot delete this service because bookings exist.'
-            ]);
-        }
-
-        // Delete image
-        if ($service->image) {
-            Storage::disk('public')->delete($service->image);
-        }
-
-        $service->delete();
-
-        return redirect()
-            ->route('service.index_page')
-            ->with('success', 'Service deleted successfully.');
+        return redirect()->route('service.index_page')->with('success', 'Service archive status updated.');
     }
 }
-

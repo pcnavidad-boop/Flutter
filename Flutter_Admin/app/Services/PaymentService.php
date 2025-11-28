@@ -4,39 +4,35 @@ namespace App\Services;
 
 use App\Models\RoomBooking;
 use App\Models\ServiceBooking;
-use App\Services\BookingCalculator;
 
 class PaymentService
 {
-    // Validate booking reference format
-    public static function isRoomReference(string $reference): bool
+    // Validate booking reference prefixes
+    public static function isRoomReference(string $ref): bool
     {
-        return preg_match('/^RB-[A-Z0-9]{8}$/', $reference) === 1;
+        return preg_match('/^RB-[A-Z0-9]{8}$/', $ref) === 1;
     }
 
-    public static function isServiceReference(string $reference): bool
+    public static function isServiceReference(string $ref): bool
     {
-        return preg_match('/^SB-[A-Z0-9]{8}$/', $reference) === 1;
+        return preg_match('/^SB-[A-Z0-9]{8}$/', $ref) === 1;
     }
 
+    // Auto-detect type by reference
     public static function detectBookingType(string $reference): ?string
     {
-        if (self::isRoomReference($reference)) return 'room';
-        if (self::isServiceReference($reference)) return 'service';
-        return null;
+        return match (true) {
+            self::isRoomReference($reference)    => 'room',
+            self::isServiceReference($reference) => 'service',
+            default => null,
+        };
     }
 
-
-    // Find booking via reference
+    // Lookup booking via reference
     public static function findBookingByReference(string $type, string $reference)
     {
-        if ($type === 'room' && !self::isRoomReference($reference)) {
-            return null;
-        }
-
-        if ($type === 'service' && !self::isServiceReference($reference)) {
-            return null;
-        }
+        if ($type === 'room' && !self::isRoomReference($reference)) return null;
+        if ($type === 'service' && !self::isServiceReference($reference)) return null;
 
         return match ($type) {
             'room'    => RoomBooking::where('reference', $reference)->first(),
@@ -45,54 +41,63 @@ class PaymentService
         };
     }
 
-
-    // Update booking payment status based on payments
+    // Update payment status
     public static function updateBookingPaymentStatus($booking): void
     {
-        $total = BookingCalculator::computeTotal($booking);
+        if (!$booking) return;
+
+        // Use stored total_price when available (optimization)
+        $total = $booking->total_price ?? BookingCalculator::computeTotal($booking);
 
         $paid     = (float) $booking->totalPaymentsCompleted();
         $refunded = (float) $booking->totalPaymentsRefunded();
+        $netPaid  = max(0, $paid - $refunded);
 
-        $netPaid = max(0, $paid - $refunded);
-
-        // FULLY REFUNDED
-        if ($netPaid == 0 && $refunded > 0) {
-            $booking->payment_status = 'refunded';
-            $booking->save();
-            return;
-        }
-
-        // FULLY PAID
-        if ($netPaid >= $total && $total > 0) {
+        // Handle zero-total bookings
+        if ($total == 0) {
             $booking->payment_status = 'fully_paid';
             $booking->save();
             return;
         }
 
-        // DOWNPAYMENT MADE
+        // Fully refunded
+        if ($refunded >= $total && $netPaid == 0) {
+            $booking->payment_status = 'refunded';
+            $booking->save();
+            return;
+        }
+
+        // Fully paid
+        if ($netPaid >= $total) {
+            $booking->payment_status = 'fully_paid';
+            $booking->save();
+            return;
+        }
+
+        // Partial (downpayment)
         if ($netPaid > 0) {
             $booking->payment_status = 'downpayment';
             $booking->save();
             return;
         }
 
-        // DEFAULT
+        // No payments
         $booking->payment_status = 'downpayment';
         $booking->save();
     }
 
-
-    // 30% Downpayment calculation
+    // Calculates required downpayment (30%) but capped by remaining balance
     public static function requiredDownpayment($booking): float
     {
         $total = BookingCalculator::computeTotal($booking);
+        $remaining = self::remainingBalance($booking);
 
-        return round($total * 0.30, 2);
+        $downpayment = round($total * 0.30, 2);
+
+        return min($downpayment, $remaining);
     }
 
-
-    // Remaining balance
+    // Remaining balance wrapper
     public static function remainingBalance($booking): float
     {
         return BookingCalculator::remainingBalance($booking);

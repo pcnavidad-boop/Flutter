@@ -25,15 +25,16 @@ class NewServiceBookingNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('New Service Booking')
+            ->subject('New Service Booking Submitted')
             ->greeting('Hello Admin,')
-            ->line('A new service booking has been submitted.')
-            ->line("Reference: {$this->booking->reference}")
-            ->line("Guest Name: {$this->booking->guest_name}")
-            ->line("Service: {$this->booking->service->name}")
-            ->line("Appointment Date: " . $this->booking->appointment_date->format('M d, Y'))
-            ->line("Time: " . $this->formatTimeRange())
-            ->action('View Booking List', route('service_booking.index_page'));
+            ->line('A new service booking has been created.')
+            ->line("**Reference:** {$this->booking->reference}")
+            ->line("**Guest:** {$this->booking->guest_name}")
+            ->line("**Service:** {$this->booking->service->name}")
+            ->line("**Date:** " . $this->booking->appointment_date->format('M d, Y'))
+            ->line("**Time:** " . $this->formatTimeRange())
+            ->line("**Guests:** {$this->booking->number_of_guests}")
+            ->action('Open Service Bookings', route('service_booking.index_page'));
     }
 
     public function toArray(object $notifiable): array
@@ -46,12 +47,10 @@ class NewServiceBookingNotification extends Notification
 
     private function formatTimeRange(): string
     {
-        if (!$this->booking->start_time || !$this->booking->end_time) {
-            return 'N/A';
-        }
+        if (!$this->booking->start_time || !$this->booking->end_time) return 'N/A';
 
         return date('h:i A', strtotime($this->booking->start_time))
-             . ' – '
-             . date('h:i A', strtotime($this->booking->end_time));
+            . ' – '
+            . date('h:i A', strtotime($this->booking->end_time));
     }
 }

@@ -26,27 +26,16 @@ class NewRoomBookingNotification extends Notification
     {
         $room = $this->booking->room;
 
-        $mail = (new MailMessage)
-            ->subject('New Room Booking')
+        return (new MailMessage)
+            ->subject('New Room Booking Submitted')
             ->greeting('Hello Admin,')
-            ->line('A new room booking has been submitted.')
-            ->line("Reference: {$this->booking->reference}")
-            ->line("Guest Name: {$this->booking->guest_name}")
-            ->line("Room: {$room->name}");
-
-        if ($this->booking->check_in_date) {
-            $mail->line("Check-in: " . $this->booking->check_in_date->format('M d, Y'))
-                 ->line("Check-out: " . $this->booking->check_out_date->format('M d, Y'));
-        } else {
-            $mail->line(
-                "Event Dates: " .
-                $this->booking->event_start_date->format('M d, Y') .
-                " – " .
-                $this->booking->event_end_date->format('M d, Y')
-            );
-        }
-
-        return $mail->action('View Booking List', route('room_booking.index_page'))
+            ->line('A new room booking has been created.')
+            ->line("**Reference:** {$this->booking->reference}")
+            ->line("**Guest:** {$this->booking->guest_name}")
+            ->line("**Room:** {$room->name}")
+            ->line("**Dates:** {$this->booking->start_date->format('M d, Y')} – {$this->booking->end_date->format('M d, Y')}")
+            ->line("**Guests:** {$this->booking->number_of_guests}")
+            ->action('Open Bookings', route('room_booking.index_page'))
             ->line('Thank you.');
     }
 

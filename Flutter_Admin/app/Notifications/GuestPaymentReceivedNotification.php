@@ -30,18 +30,18 @@ class GuestPaymentReceivedNotification extends Notification
         $remaining = BookingCalculator::remainingBalance($this->booking);
 
         $mail = (new MailMessage)
-            ->subject('Payment Received for Your Booking')
+            ->subject('We Received Your Payment!')
             ->greeting("Hello {$this->booking->guest_name},")
-            ->line("We have successfully received your payment.")
-            ->line("Booking Reference: {$this->booking->reference}")
-            ->line("Amount Paid: ₱" . number_format($this->amount, 2));
+            ->line("Thank you — we have received your payment.")
+            ->line("**Booking Reference:** {$this->booking->reference}")
+            ->line("**Amount Paid:** ₱" . number_format($this->amount, 2));
 
         if ($remaining > 0) {
-            $mail->line("Remaining Balance: ₱" . number_format($remaining, 2))
-                 ->action('Pay Remaining Balance', url("/hotel/pay/remaining/{$this->booking->reference}"))
-                 ->line('You may complete your payment anytime before your arrival.');
+            $mail->line("**Remaining Balance:** ₱" . number_format($remaining, 2))
+                ->action('Pay Remaining Balance', url("/payment/payRemaining/{$this->booking->reference}"))
+                ->line('You may complete your payment anytime before your arrival.');
         } else {
-            $mail->line('Your booking is now fully paid! 🎉');
+            $mail->line('🎉 Your booking is now fully paid!');
         }
 
         return $mail->line('Thank you for choosing our hotel.');

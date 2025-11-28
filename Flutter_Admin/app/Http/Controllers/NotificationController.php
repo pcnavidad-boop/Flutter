@@ -7,18 +7,22 @@ use App\Services\PaymentService;
 
 class NotificationController extends Controller
 {
-    // Show all notifications for the authenticated user
+    // ---------------------------------------------------------
+    // List notifications
+    // ---------------------------------------------------------
     public function index()
     {
         $notifications = auth()->user()
             ->notifications()
-            ->latest()
+            ->orderBy('created_at', 'desc')
             ->get();
 
         return view('notifications.index', compact('notifications'));
     }
 
-    // AJAX: Fetch unread notifications (limit 20)
+    // ---------------------------------------------------------
+    // AJAX: Fetch unread notifications (max 20)
+    // ---------------------------------------------------------
     public function fetchUnread()
     {
         $user = auth()->user();
@@ -29,7 +33,9 @@ class NotificationController extends Controller
         ]);
     }
 
-    // Mark a single notification as read
+    // ---------------------------------------------------------
+    // Mark single notification as read
+    // ---------------------------------------------------------
     public function markAsRead($id)
     {
         $notification = auth()->user()
@@ -42,15 +48,18 @@ class NotificationController extends Controller
         return redirect()->back();
     }
 
-    // Mark all unread notifications as read
+    // ---------------------------------------------------------
+    // Mark ALL unread notifications as read
+    // ---------------------------------------------------------
     public function markAllAsRead()
     {
         auth()->user()->unreadNotifications->markAsRead();
-
         return response()->json(['success' => true]);
     }
 
-    // Delete a notification
+    // ---------------------------------------------------------
+    // Delete a notification (soft delete)
+    // ---------------------------------------------------------
     public function destroy($id)
     {
         $notification = auth()->user()
@@ -65,7 +74,9 @@ class NotificationController extends Controller
             ->with('success', 'Notification deleted.');
     }
 
-    // Open a notification and redirect to its booking page
+    // ---------------------------------------------------------
+    // Open notification and redirect to the booking it refers to
+    // ---------------------------------------------------------
     public function open($id)
     {
         $notification = auth()->user()
@@ -73,54 +84,36 @@ class NotificationController extends Controller
             ->where('id', $id)
             ->firstOrFail();
 
-        // Mark as read immediately
         $notification->markAsRead();
 
         $data = $notification->data ?? [];
 
-        // Must contain required keys
-        if (!isset($data['reference'], $data['title'])) {
-            return redirect()
-                ->back()
-                ->with('error', 'Invalid notification data.');
+        // Validate expected payload
+        if (!isset($data['reference'])) {
+            return redirect()->back()->with('error', 'Invalid notification data.');
         }
 
         $reference = $data['reference'];
 
-        // Determine booking type based on ref prefix (RB-xxxx, SB-xxxx)
+        // Determine booking type by reference prefix
         $type = PaymentService::detectBookingType($reference);
 
         if (!$type) {
-            return redirect()
-                ->back()
-                ->with('error', 'Invalid booking reference.');
+            return redirect()->back()->with('error', 'Invalid booking reference.');
         }
 
-        // Check if booking still exists
+        // Find booking
         $booking = PaymentService::findBookingByReference($type, $reference);
 
         if (!$booking) {
-            return redirect()
-                ->back()
-                ->with('error', 'This booking no longer exists.');
+            return redirect()->back()->with('error', 'This booking no longer exists.');
         }
 
-        // Determine redirect target
-        $title = strtolower($data['title']);
-
-        if (str_contains($title, 'room')) {
-            return redirect()->route('room_booking.index_page', [
-                'ref' => $reference,
-            ]);
-        }
-
-        if (str_contains($title, 'service')) {
-            return redirect()->route('service_booking.index_page', [
-                'ref' => $reference,
-            ]);
-        }
-
-        // Fallback
-        return redirect()->back();
+        // Routing based on type, NOT title string
+        return match ($type) {
+            'room'    => redirect()->route('room_booking.index_page', ['ref' => $reference]),
+            'service' => redirect()->route('service_booking.index_page', ['ref' => $reference]),
+            default   => redirect()->back()->with('error', 'Unsupported notification type.'),
+        };
     }
 }

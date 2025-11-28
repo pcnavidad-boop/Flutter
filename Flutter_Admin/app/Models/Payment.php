@@ -11,31 +11,36 @@ class Payment extends Model
     use HasFactory;
 
     protected $fillable = [
+        'reference',
         'amount',
         'method',
         'channel',
         'status',
         'processed_by',
         'paid_at',
+        'payable_id',
+        'payable_type',
     ];
 
     protected $casts = [
         'amount'  => 'decimal:2',
-        'paid_at' => 'date',
+        'paid_at' => 'datetime',
     ];
 
-    // Auto-generate reference, paid_at, and default channel
     protected static function boot()
     {
         parent::boot();
 
         static::creating(function ($payment) {
 
-            do {
-                $ref = 'PAY-' . strtoupper(Str::random(10));
-            } while (Payment::where('reference', $ref)->exists());
+            // Auto-generate ref unless Stripe sent one
+            if (!$payment->reference) {
+                do {
+                    $ref = 'PAY-' . strtoupper(Str::random(10));
+                } while (Payment::where('reference', $ref)->exists());
 
-            $payment->reference = $ref;
+                $payment->reference = $ref;
+            }
 
             if (!$payment->paid_at) {
                 $payment->paid_at = now();
@@ -47,7 +52,6 @@ class Payment extends Model
         });
     }
 
-    // Relationships
     public function payable()
     {
         return $this->morphTo();
@@ -58,7 +62,6 @@ class Payment extends Model
         return $this->belongsTo(User::class, 'processed_by');
     }
 
-    // Accessors
     public function getFormattedAmountAttribute()
     {
         return number_format($this->amount, 2);
@@ -74,7 +77,6 @@ class Payment extends Model
         return "{$this->formatted_amount} ({$this->method})";
     }
 
-    // Appended attributes
     protected $appends = [
         'formatted_amount',
         'formatted_date',

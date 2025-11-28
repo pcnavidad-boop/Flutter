@@ -6,12 +6,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Str;
 use Illuminate\Notifications\Notifiable;
+use App\Services\BookingCalculator;
 
 class RoomBooking extends Model
 {
     use HasFactory, Notifiable;
 
     protected $fillable = [
+        'reference',
         'guest_name',
         'guest_email',
         'guest_contact',
@@ -34,17 +36,23 @@ class RoomBooking extends Model
         'end_date'     => 'date',
     ];
 
-    // Auto-generate reference + booking_date
     protected static function boot()
     {
         parent::boot();
 
-        static::creating(function ($booking) {
-            if (!$booking->reference) {
-                $booking->reference = 'RB-' . strtoupper(Str::random(8));
-            }
-            $booking->booking_date = now();
+        static::creating(function ($b) {
+            $b->reference = self::uniqueReference();
+            $b->booking_date = now();
         });
+    }
+
+    private static function uniqueReference(): string
+    {
+        do {
+            $ref = 'RB-' . strtoupper(Str::random(8));
+        } while (self::where('reference', $ref)->exists());
+
+        return $ref;
     }
 
     // Relationships
@@ -63,7 +71,7 @@ class RoomBooking extends Model
         return $this->morphMany(Payment::class, 'payable');
     }
 
-    // Scopes and Calculated Attributes
+    // Payment calculations
     public function totalPaymentsCompleted()
     {
         return $this->payments()->where('status', 'completed')->sum('amount');
@@ -76,16 +84,14 @@ class RoomBooking extends Model
 
     public function getRemainingBalanceAttribute()
     {
-        return max(0, $this->total_price - $this->totalPaymentsCompleted());
+        return BookingCalculator::remainingBalance($this);
     }
 
     // Accessors
     public function getPeriodAttribute()
     {
-        if ($this->start_date && $this->end_date) {
-            return $this->start_date->format('M d, Y') . " - " . $this->end_date->format('M d, Y');
-        }
-        return null;
+        if (!$this->start_date || !$this->end_date) return null;
+        return $this->start_date->format('M d, Y') . ' - ' . $this->end_date->format('M d, Y');
     }
 
     public function getScheduleDisplayAttribute()
@@ -103,13 +109,11 @@ class RoomBooking extends Model
         return $this->room && $this->room->room_type !== 'function';
     }
 
-    // Notification Routing
     public function routeNotificationForMail(): string
     {
         return $this->guest_email;
     }
 
-    // Appended attributes
     protected $appends = [
         'period',
         'schedule_display',

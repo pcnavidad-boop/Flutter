@@ -31,20 +31,24 @@ class Room extends Model
         'is_archived' => 'boolean',
     ];
 
-    // Auto-generate & update slugs
     protected static function boot()
     {
         parent::boot();
 
         static::creating(function ($room) {
-            $room->slug = Str::slug($room->name . '-' . uniqid());
+            $room->slug = self::uniqueSlug($room->name);
         });
 
         static::updating(function ($room) {
             if ($room->isDirty('name')) {
-                $room->slug = Str::slug($room->name . '-' . uniqid());
+                $room->slug = self::uniqueSlug($room->name);
             }
         });
+    }
+
+    private static function uniqueSlug(string $name): string
+    {
+        return Str::slug($name . '-' . Str::random(6));
     }
 
     public function getRouteKeyName()
@@ -93,7 +97,8 @@ class Room extends Model
 
     public function getPriceLabelAttribute()
     {
-        return $this->formatted_price . ($this->price_type === 'per_night' ? ' / night' : ' / event');
+        return $this->formatted_price .
+            ($this->price_type === 'per_night' ? ' / night' : ' / event');
     }
 
     public function getIsFunctionRoomAttribute()
@@ -110,7 +115,6 @@ class Room extends Model
         };
     }
 
-    // Appended attributes
     protected $appends = [
         'formatted_price',
         'price_label',
