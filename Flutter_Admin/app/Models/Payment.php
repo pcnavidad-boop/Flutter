@@ -4,67 +4,64 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Str;
 
 class Payment extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'room_booking_id',
-        'service_booking_id',
-        'admin_id',
+        'reference',
         'amount',
-        'date',
         'method',
+        'channel',
         'status',
+        'processed_by',
+        'paid_at',
+        'payable_id',
+        'payable_type',
     ];
 
-    protected function casts(): array
+    protected $casts = [
+        'amount'  => 'decimal:2',
+        'paid_at' => 'datetime',
+    ];
+
+    protected static function boot()
     {
-        return [
-            'amount' => 'decimal:2',
-            'date' => 'date',
-        ];
+        parent::boot();
+
+        static::creating(function ($payment) {
+
+            // Auto-generate ref unless Stripe sent one
+            if (!$payment->reference) {
+                do {
+                    $ref = 'PAY-' . strtoupper(Str::random(10));
+                } while (Payment::where('reference', $ref)->exists());
+
+                $payment->reference = $ref;
+            }
+
+            if (!$payment->paid_at) {
+                $payment->paid_at = now();
+            }
+
+            if (!$payment->channel) {
+                $payment->channel = 'offline';
+            }
+        });
     }
 
-    // Relationships
-    public function roomBooking()
+    public function payable()
     {
-        return $this->belongsTo(RoomBooking::class, 'room_booking_id');
+        return $this->morphTo();
     }
 
-    public function serviceBooking()
+    public function processor()
     {
-        return $this->belongsTo(ServiceBooking::class, 'service_booking_id');
+        return $this->belongsTo(User::class, 'processed_by');
     }
 
-    public function admin()
-    {
-        return $this->belongsTo(User::class, 'admin_id');
-    }
-
-    // Scopes
-    public function scopeCompleted($query)
-    {
-        return $query->where('status', 'Completed');
-    }
-
-    public function scopePending($query)
-    {
-        return $query->where('status', 'Pending');
-    }
-
-    public function scopeRefunded($query)
-    {
-        return $query->where('status', 'Refunded');
-    }
-
-    public function scopeByMethod($query, $method)
-    {
-        return $query->where('method', $method);
-    }
-
-    // Accessors
     public function getFormattedAmountAttribute()
     {
         return number_format($this->amount, 2);
@@ -72,6 +69,17 @@ class Payment extends Model
 
     public function getFormattedDateAttribute()
     {
-        return $this->date ? $this->date->format('M d, Y') : null;
+        return $this->paid_at ? $this->paid_at->format('M d, Y') : null;
     }
+
+    public function getPaymentLabelAttribute()
+    {
+        return "{$this->formatted_amount} ({$this->method})";
+    }
+
+    protected $appends = [
+        'formatted_amount',
+        'formatted_date',
+        'payment_label',
+    ];
 }

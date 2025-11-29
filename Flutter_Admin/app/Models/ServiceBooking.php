@@ -2,90 +2,120 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Str;
+use Illuminate\Notifications\Notifiable;
+use App\Services\BookingCalculator;
 
 class ServiceBooking extends Model
 {
-    use HasFactory;
+    use HasFactory, Notifiable;
 
-    /**
-     * The attributes that are mass assignable.
-     */
     protected $fillable = [
+        'reference',
         'guest_name',
         'guest_email',
         'guest_contact',
-        'service_id',
-        'user_id',
-        'date',
+        'number_of_guests',
+        'appointment_date',
         'start_time',
         'end_time',
-        'number_of_guests',
         'total_price',
         'remarks',
         'type',
-        'booking_date',
         'booking_status',
         'payment_status',
         'status_change_reason',
+        'created_by',
     ];
 
-    protected function casts(): array
+    protected $casts = [
+        'total_price'      => 'decimal:2',
+        'booking_date'     => 'date',
+        'appointment_date' => 'date',
+        'start_time'       => 'string',
+        'end_time'         => 'string',
+    ];
+
+    protected static function boot()
     {
-        return [
-            'total_price' => 'decimal:2',
-            'date' => 'date',
-            'booking_date' => 'date',
-            'start_time' => 'time',
-            'end_time' => 'time',
-        ];
+        parent::boot();
+
+        static::creating(function ($b) {
+            $b->reference = self::uniqueReference();
+            $b->booking_date = now();
+        });
+    }
+
+    private static function uniqueReference(): string
+    {
+        do {
+            $ref = 'SB-' . strtoupper(Str::random(8));
+        } while (self::where('reference', $ref)->exists());
+
+        return $ref;
     }
 
     // Relationships
     public function service()
     {
-        return $this->belongsTo(Service::class, 'service_id');
+        return $this->belongsTo(Service::class);
     }
 
-    public function user()
+    public function creator()
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function payment()
+    public function payments()
     {
-        return $this->hasOne(Payment::class, 'service_booking_id');
+        return $this->morphMany(Payment::class, 'payable');
     }
 
-    // Scopes
-    public function scopeConfirmed($query)
+    // Payment calculations
+    public function totalPaymentsCompleted()
     {
-        return $query->where('booking_status', 'Confirmed');
+        return $this->payments()->where('status', 'completed')->sum('amount');
     }
 
-    public function scopeUnpaid($query)
+    public function totalPaymentsRefunded()
     {
-        return $query->where('payment_status', 'Unpaid');
+        return $this->payments()->where('status', 'refunded')->sum('amount');
     }
 
-    public function scopeActive($query)
+    public function getRemainingBalanceAttribute()
     {
-        return $query->whereNotIn('booking_status', ['Cancelled', 'Declined']);
+        return BookingCalculator::remainingBalance($this);
     }
 
     // Accessors
     public function getFormattedPriceAttribute()
     {
-        return $this->total_price ? number_format($this->total_price, 2) : '0.00';
+        return number_format($this->total_price ?? 0, 2);
     }
 
     public function getServiceScheduleAttribute()
     {
-        $date = $this->date ? $this->date->format('M d, Y') : 'No date set';
+        if (!$this->appointment_date) return 'No date selected';
+
+        $date = $this->appointment_date->format('M d, Y');
+
         if ($this->start_time && $this->end_time) {
-            return "{$date} ({$this->start_time} - {$this->end_time})";
+            return "{$date} ({$this->start_time->format('H:i')} - {$this->end_time->format('H:i')})";
         }
+
         return $date;
     }
+
+    public function routeNotificationForMail(): string
+    {
+        return $this->guest_email;
+    }
+
+    protected $appends = [
+        'formatted_price',
+        'service_schedule',
+        'remaining_balance',
+    ];
 }

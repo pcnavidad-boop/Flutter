@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Str;
 
 class Service extends Model
 {
@@ -11,6 +12,8 @@ class Service extends Model
 
     protected $fillable = [
         'name',
+        'location',
+        'service_type',
         'description',
         'capacity',
         'image',
@@ -20,42 +23,95 @@ class Service extends Model
         'end_time',
         'status',
         'is_archived',
-        'user_id',
+        'created_by',
+        'slug',
     ];
 
-    protected function casts(): array
+    protected $casts = [
+        'base_price'  => 'decimal:2',
+        'is_archived' => 'boolean',
+        'start_time'  => 'string',
+        'end_time'    => 'string',
+    ];
+
+    protected static function boot()
     {
-        return [
-            'base_price' => 'decimal:2',
-            'is_archived' => 'boolean',
-        ];
+        parent::boot();
+
+        static::creating(function ($service) {
+            $service->slug = self::uniqueSlug($service->name);
+        });
+
+        static::updating(function ($service) {
+            if ($service->isDirty('name')) {
+                $service->slug = self::uniqueSlug($service->name);
+            }
+        });
+    }
+
+    private static function uniqueSlug(string $name): string
+    {
+        return Str::slug($name . '-' . Str::random(6));
+    }
+
+    public function getRouteKeyName()
+    {
+        return 'slug';
     }
 
     // Relationships
-    public function user()
+    public function creator()
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function bookings()
     {
-        return $this->hasMany(ServiceBooking::class, 'service_id');
+        return $this->hasMany(ServiceBooking::class);
     }
 
     // Scopes
-    public function scopeAvailable($query)
+    public function scopeAvailable($q)
     {
-        return $query->where('status', 'Available');
+        return $q->where('status', 'available');
     }
 
-    public function scopeActive($query)
+    public function scopeActive($q)
     {
-        return $query->where('is_archived', false);
+        return $q->where('is_archived', false);
     }
 
-    // Accessor
+    // Mutators
+    public function setNameAttribute($value)
+    {
+        $this->attributes['name'] = ucwords(strtolower($value));
+    }
+
+    // Accessors
     public function getFormattedPriceAttribute()
     {
         return number_format($this->base_price, 2);
     }
+
+    public function getScheduleAttribute()
+    {
+        if (!$this->start_time || !$this->end_time) return null;
+        return $this->start_time->format('H:i') . ' - ' . $this->end_time->format('H:i');
+    }
+
+    public function getPriceLabelAttribute()
+    {
+        return match ($this->price_type) {
+            'per_hour'   => "{$this->formatted_price} / hour",
+            'per_day'    => "{$this->formatted_price} / day",
+            'per_person' => "{$this->formatted_price} / person",
+            default      => $this->formatted_price,
+        };
+    }
+
+    protected $appends = [
+        'formatted_price',
+        'schedule',
+        'price_label',
+    ];
 }

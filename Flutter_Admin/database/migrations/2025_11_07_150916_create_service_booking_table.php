@@ -14,30 +14,39 @@ return new class extends Migration
         Schema::create('service_bookings', function (Blueprint $table) {
             $table->id();
 
+            // Relationships
+            $table->foreignId('service_id')->constrained('services')->onDelete('cascade');
+            $table->foreignId('created_by')->nullable()->constrained('users')->onDelete('cascade');
+
             // Guest Information
             $table->string('guest_name');
-            $table->string('guest_email');
+            $table->string('guest_email'); 
             $table->string('guest_contact')->nullable();
 
-            // Foreign Keys
-            $table->foreignId('service_id')->constrained('services')->onDelete('cascade');
-            $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('set null');
-        
             // Booking Details
-            $table->date('date');
+            $table->unsignedSmallInteger('number_of_guests')->default(1);
+            $table->date('appointment_date');
             $table->time('start_time')->nullable();
             $table->time('end_time')->nullable();
-            $table->integer('quantity')->default(1);
             $table->decimal('total_price', 10, 2)->nullable();
             $table->text('remarks')->nullable();
 
             // Booking Life Cycle
-            $table->enum('type', ['Website','Walk-in','Phone','E-mail'])->default('Website');
+            $table->string('reference')->unique();
+            $table->enum('type', ['website','walk-in','phone','email'])->default('website');
             $table->date('booking_date');
-            $table->enum('booking_status', ['Pending','Confirmed','Declined','Cancelled','Completed'])->default('Pending');
-            $table->enum('payment_status', ['Unpaid','Partially_Paid','Paid','Refunded'])->default('Unpaid');
+            $table->enum('booking_status', ['confirmed','completed','cancelled'])->default('confirmed');
+            $table->enum('payment_status', ['downpayment','fully_paid','refunded'])->default('downpayment');
             $table->text('status_change_reason')->nullable();
-            
+
+            // Indexes
+            $table->index('service_id');
+            $table->index('created_by');
+            $table->index('booking_status');
+            $table->index('payment_status');
+            $table->index('booking_date');
+            $table->index('appointment_date');
+
             $table->timestamps();
         });
     }

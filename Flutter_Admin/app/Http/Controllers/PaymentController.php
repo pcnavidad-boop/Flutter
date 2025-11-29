@@ -3,64 +3,118 @@
 namespace App\Http\Controllers;
 
 use App\Models\Payment;
-use App\Models\RoomBooking;
-use App\Models\ServiceBooking;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use App\Services\PaymentService;
+use App\Services\PaymentRollbackService;
+use App\Services\BookingLifecycleService;
 
 class PaymentController extends Controller
 {
-    // View all payments
+    protected PaymentRollbackService $rollback;
+    protected BookingLifecycleService $lifecycle;
+
+    public function __construct(PaymentRollbackService $rollback, BookingLifecycleService $lifecycle)
+    {
+        $this->rollback = $rollback;
+        $this->lifecycle = $lifecycle;
+    }
+
+    // List payments
     public function index()
     {
-        $payments = Payment::with(['roomBooking', 'serviceBooking', 'admin'])
-            ->orderBy('date', 'desc')
-            ->get();
-
+        $payments = \App\Models\Payment::with(['payable', 'processor'])->orderBy('paid_at', 'desc')->get();
         return view('payment.index', compact('payments'));
     }
 
-    // Create a payment
+    // Record offline payment
     public function create(Request $request)
     {
         $data = $request->validate([
-            'room_booking_id'    => 'nullable|exists:room_bookings,id',
-            'service_booking_id' => 'nullable|exists:service_bookings,id',
-            'amount'             => 'required|numeric|min:0',
-            'date'               => 'required|date',
-            'method'             => 'required|in:Cash,Card,Bank Transfer,E-Wallet',
-            'status'             => 'required|in:Pending,Completed,Failed,Refunded',
+            'booking_type'      => 'required|in:room,service',
+            'booking_reference' => 'required|string',
+            'amount'            => 'required|numeric|min:0.01',
+            'method'            => 'required|in:cash,card,bank_transfer,e_wallet',
+            'status'            => 'required|in:completed,refunded',
         ]);
 
-        // Only one booking type may be filled
-        if (!$data['room_booking_id'] && !$data['service_booking_id']) {
-            return back()->withErrors('You must select either a room or service booking.');
+        // Reference validation
+        if ($data['booking_type'] === 'room' && !PaymentService::isRoomReference($data['booking_reference'])) {
+            return back()->withErrors(['booking_reference' => 'Invalid room booking reference. (RB-XXXXXXXX expected)']);
+        }
+        if ($data['booking_type'] === 'service' && !PaymentService::isServiceReference($data['booking_reference'])) {
+            return back()->withErrors(['booking_reference' => 'Invalid service booking reference. (SB-XXXXXXXX expected)']);
         }
 
-        if ($data['room_booking_id'] && $data['service_booking_id']) {
-            return back()->withErrors('A payment cannot belong to both room and service bookings.');
+        $booking = PaymentService::findBookingByReference($data['booking_type'], $data['booking_reference']);
+        if (!$booking) {
+            return back()->withErrors(['booking_reference' => 'Booking not found.']);
         }
 
-        $data['admin_id'] = auth()->id();
-
-        $payment = Payment::create($data);
-
-        // Update payment status on booking
-        if ($payment->room_booking_id) {
-            $booking = RoomBooking::find($payment->room_booking_id);
-            $booking->update(['payment_status' => $payment->status === 'Completed' ? 'Paid' : 'Unpaid']);
+        // Lifecycle check for payable (archived / maintenance / invalid statuses)
+        try {
+            $this->lifecycle->assertBookingPayable($booking);
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        if ($payment->service_booking_id) {
-            $booking = ServiceBooking::find($payment->service_booking_id);
-            $booking->update(['payment_status' => $payment->status === 'Completed' ? 'Paid' : 'Unpaid']);
+        // Prevent overpayment
+        $remaining = PaymentService::remainingBalance($booking);
+        if ($data['status'] === 'completed' && $data['amount'] > $remaining) {
+            return back()->withErrors(['amount' => "Payment exceeds remaining balance of ₱" . number_format($remaining, 2)]);
         }
 
-        return redirect()->route('payment.index_page')->with('success', 'Payment recorded.');
+        // Prevent adding payments if already fully paid
+        if ($booking->payment_status === 'fully_paid') {
+            return back()->withErrors(['error' => 'This booking is already fully paid.']);
+        }
+
+        // Record offline payment
+        $payment = $booking->payments()->create([
+            'processed_by' => Auth::id(),
+            'amount'       => $data['amount'],
+            'method'       => $data['method'],
+            'status'       => $data['status'],
+            'channel'      => 'offline',
+            'paid_at'      => now(),
+        ]);
+
+        // Update booking payment status
+        PaymentService::updateBookingPaymentStatus($booking);
+
+        return redirect()->route('payment.index_page')->with('success', 'Offline payment recorded successfully.');
     }
 
+    // Rollback offline payment (no destructive deletion of API/online payments)
     public function destroy(Payment $payment)
     {
-        $payment->delete();
-        return back()->with('success', 'Payment deleted.');
+        // Prevent rolling back API/online payments here
+        if ($payment->method === 'api' || $payment->channel === 'online') {
+            return back()->withErrors(['error' => 'Stripe/API payments cannot be deleted here. Issue a refund instead.']);
+        }
+
+        if ($payment->status === 'refunded') {
+            return back()->withErrors(['error' => 'Refunded payments cannot be deleted.']);
+        }
+
+        $booking = $payment->payable;
+
+        try {
+            $this->lifecycle->assertBookingMutableForPaymentRollback($booking);
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        try {
+            // rollbackOfflinePayment will perform transactional safety checks
+            $this->rollback->rollbackOfflinePayment($payment, Auth::id());
+        } catch (\Throwable $e) {
+            return back()->withErrors(['error' => 'Failed to rollback payment: ' . $e->getMessage()]);
+        }
+
+        // Recompute booking payment status
+        PaymentService::updateBookingPaymentStatus($booking);
+
+        return back()->with('success', 'Payment rolled back and booking updated.');
     }
 }

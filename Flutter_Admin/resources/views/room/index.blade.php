@@ -2,7 +2,6 @@
 
 @section('content')
 
-<!-- DataTables CSS (CDN) -->
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.dataTables.min.css">
 
@@ -11,6 +10,7 @@
 <div class="container mt-5">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h3>Rooms</h3>
+
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createRoomModal">
             + Add Room
         </button>
@@ -18,125 +18,149 @@
 
     <div class="card">
         <div class="card-body">
-            
+
             <table id="rooms-table" class="table table-striped align-middle display nowrap" style="width:100%">
                 <thead class="table-dark">
                     <tr>
                         <th>#</th>
                         <th>Room Number</th>
                         <th>Type</th>
-                        <th>Price/Night</th>
+                        <th>Price Type</th>
+                        <th>Base Price</th>
                         <th>Beds</th>
                         <th>Capacity</th>
-                        <th>Availability</th>
+                        <th>Status</th>
+                        <th>Archived</th>
                         <th>Description</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
+
                 <tbody>
-                    @forelse ($rooms as $room)
+                    @foreach ($rooms as $room)
                     <tr>
                         <td>{{ $room->id }}</td>
                         <td>{{ $room->room_number }}</td>
-                        <td>{{ $room->room_type ?? 'N/A' }}</td>
-                        <td>₱{{ number_format($room->price_per_night, 2) }}</td>
+                        <td>{{ $room->type }}</td>
+                        <td>{{ $room->price_type }}</td>
+                        <td>₱{{ number_format($room->base_price, 2) }}</td>
                         <td>{{ $room->number_of_beds ?? 'N/A' }}</td>
-                        <td>{{ $room->room_capacity }}</td>
+                        <td>{{ $room->capacity }}</td>
+
                         <td>
-                            @if ($room->room_availability_status)
+                            @if ($room->status === 'Available')
                                 <span class="badge bg-success">Available</span>
+                            @elseif ($room->status === 'Occupied')
+                                <span class="badge bg-warning">Occupied</span>
+                            @elseif ($room->status === 'Maintenance')
+                                <span class="badge bg-info">Maintenance</span>
                             @else
                                 <span class="badge bg-danger">Unavailable</span>
                             @endif
                         </td>
-                        <td>{{ \Illuminate\Support\Str::limit($room->room_description, 40, '...') }}</td>
+
                         <td>
+                            @if($room->is_archived)
+                                <span class="badge bg-danger">Archived</span>
+                            @else
+                                <span class="badge bg-success">Active</span>
+                            @endif
+                        </td>
+
+                        <td>{{ Str::limit($room->description, 40) }}</td>
+
+                        <td>
+                            <!-- VIEW BUTTON -->
+                            <button 
+                                class="btn btn-sm btn-outline-primary viewBtn"
+                                data-bs-toggle="modal"
+                                data-bs-target="#viewRoomModal"
+                                data-room="{{ htmlspecialchars(json_encode($room), ENT_QUOTES, 'UTF-8') }}"
+                            >View</button>
+
+                            <!-- EDIT BUTTON -->
                             <button 
                                 class="btn btn-sm btn-outline-secondary editBtn"
                                 data-bs-toggle="modal"
                                 data-bs-target="#editRoomModal"
-                                data-id="{{ $room->id }}"
-                                data-room_number="{{ $room->room_number }}"
-                                data-type="{{ $room->room_type }}"
-                                data-price="{{ $room->price_per_night }}"
-                                data-beds="{{ $room->number_of_beds }}"
-                                data-capacity="{{ $room->room_capacity }}"
-                                data-availability="{{ $room->room_availability_status }}"
-                                data-description="{{ $room->room_description }}">
-                                Edit
-                            </button>
+                                data-room="{{ htmlspecialchars(json_encode($room), ENT_QUOTES, 'UTF-8') }}"
+                            >Edit</button>
                         </td>
                     </tr>
-                    @empty
-                    <tr>
-                        <td colspan="9" class="text-center text-muted">No rooms found.</td>
-                    </tr>
-                    @endforelse
+                    @endforeach
                 </tbody>
+
             </table>
+
         </div>
     </div>
 </div>
 
-<!-- create modal -->
+<!-- --- MODALS --- -->
 <x-modal.create_room />
-
-<!-- edit modal -->
 <x-modal.edit_room />
+<x-modal.view_room />
 
-{{-- JS to populate edit modal --}}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const editButtons = document.querySelectorAll('.editBtn');
-    const editForm = document.getElementById('editRoomForm');
-
-    editButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            const id = button.dataset.id;
-            editForm.action = `/rooms/${id}`;
-
-            document.getElementById('edit_room_number').value = button.dataset.room_number ?? '';
-            document.getElementById('edit_room_type').value = button.dataset.type ?? '';
-            document.getElementById('edit_price_per_night').value = button.dataset.price ?? '';
-            document.getElementById('edit_number_of_beds').value = button.dataset.beds ?? '';
-            document.getElementById('edit_room_capacity').value = button.dataset.capacity ?? '';
-     
-            const avail = (typeof button.dataset.availability !== 'undefined') ? button.dataset.availability : (button.dataset.room_availability || '0');
-            document.getElementById('edit_room_availability').value = avail ? String(Number(avail)) : '0';
-            document.getElementById('edit_room_description').value = button.dataset.description ?? '';
-        });
-    });
-
-    const editModalEl = document.getElementById('editRoomModal');
-    editModalEl.addEventListener('hidden.bs.modal', function () {
-        editForm.reset();
-        document.getElementById('editModalAlerts').innerHTML = '';
-    });
-});
-</script>
-
-<!-- jQuery + DataTables JS (CDN) -->
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
 
-<!-- DataTables initialization -->
 <script>
 $(document).ready(function() {
     $('#rooms-table').DataTable({
         responsive: true,
-        paging: true,
-        searching: true,
-        ordering: true,
         pageLength: 10,
-        lengthMenu: [ [10, 25, 50], [10, 25, 50] ],
-        columnDefs: [
-            { orderable: false, targets: -1 } // disable ordering on last column (Actions)
-        ]
+        ordering: true,
+        columnDefs: [{ orderable: false, targets: -1 }],
+        language: {
+            emptyTable: "No rooms found.",
+            zeroRecords: "No matching rooms found."
+        }
+    });
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    // VIEW MODAL LOGIC
+    document.querySelectorAll('.viewBtn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const room = JSON.parse(btn.dataset.room);
+
+            document.getElementById('view_room_number').innerText = "Room " + room.room_number;
+            document.getElementById('view_type').innerText = room.type;
+            document.getElementById('view_price').innerText = "₱" + parseFloat(room.base_price).toLocaleString();
+            document.getElementById('view_price_type').innerText = "(" + room.price_type.replace('_', ' ') + ")";
+            document.getElementById('view_description').innerText = room.description ?? '';
+            document.getElementById('view_status').innerText = room.status;
+            document.getElementById('view_capacity').innerText = room.capacity + " guests";
+
+            document.getElementById('view_image').src =
+                room.image ? "/storage/" + room.image : "/images/default-room.jpg";
+        });
     });
 
-    // Optional: re-init tooltips (if you use them in actions)
-    $('[data-bs-toggle="tooltip"]').tooltip();
+    // EDIT MODAL LOGIC
+    document.querySelectorAll('.editBtn').forEach(btn => {
+        btn.addEventListener('click', () => {
+
+            const room = JSON.parse(btn.dataset.room);
+            const form = document.getElementById('editRoomForm');
+            form.action = `/rooms/${room.id}`;
+
+            document.getElementById('edit_room_number').value = room.room_number;
+            document.getElementById('edit_type').value = room.type;
+            document.getElementById('edit_price_type').value = room.price_type;
+            document.getElementById('edit_base_price').value = room.base_price;
+            document.getElementById('edit_number_of_beds').value = room.number_of_beds ?? '';
+            document.getElementById('edit_capacity').value = room.capacity;
+            document.getElementById('edit_status').value = room.status;
+            document.getElementById('edit_description').value = room.description ?? '';
+            document.getElementById('edit_is_archived').value = room.is_archived ? 1 : 0;
+        });
+    });
+
 });
 </script>
 

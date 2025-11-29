@@ -14,35 +14,39 @@ return new class extends Migration
         Schema::create('room_bookings', function (Blueprint $table) {
             $table->id();
 
+            // Relationships
+            $table->foreignId('room_id')->constrained('rooms')->onDelete('cascade');
+            $table->foreignId('created_by')->nullable()->constrained('users')->onDelete('cascade');
+
             // Guest Information
             $table->string('guest_name');
-            $table->string('guest_email');
+            $table->string('guest_email');     
             $table->string('guest_contact')->nullable();
 
-            // Foreign Keys
-            $table->foreignId('room_id')->constrained('rooms')->onDelete('cascade');
-            $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('set null');
-
             // Booking Details
-            $table->integer('number_of_guests')->default(1);
+            $table->unsignedSmallInteger('number_of_guests')->default(1);
+            $table->date('start_date');
+            $table->date('end_date');
             $table->decimal('total_price', 10, 2)->nullable();
             $table->text('remarks')->nullable();
 
-            // Normal Rooms
-            $table->date('check_in_date')->nullable();   
-            $table->date('check_out_date')->nullable();  
-
-            // Function Rooms
-            $table->date('event_date')->nullable();
-            $table->time('start_time')->nullable();
-            $table->time('end_time')->nullable();
-            
             // Booking Life Cycle
-            $table->enum('type', ['Website','Walk-in','Phone','E-mail'])->default('Website');
+            $table->string('reference')->unique();
+            $table->enum('type', ['website','walk-in','phone','email'])->default('website');
             $table->date('booking_date');
-            $table->enum('booking_status', ['Pending','Confirmed','Declined','Checked_In','Checked_Out','Cancelled'])->default('Pending');
-            $table->enum('payment_status', ['Unpaid','Partially_Paid','Paid','Refunded'])->default('Unpaid');
+            $table->enum('booking_status', ['confirmed','checked_in','checked_out','cancelled'])->default('confirmed');
+            $table->enum('payment_status', ['downpayment','fully_paid','refunded'])->default('downpayment');
             $table->text('status_change_reason')->nullable();
+
+            // Indexes for performance
+            $table->index('room_id');
+            $table->index('created_by');
+            $table->index('booking_status');
+            $table->index('payment_status');
+            $table->index('start_date');
+            $table->index('end_date');
+            $table->index('booking_date');
+            $table->index(['room_id', 'start_date', 'end_date']);
 
             $table->timestamps();
         });

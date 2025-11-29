@@ -14,16 +14,25 @@ return new class extends Migration
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
 
-            // Foreign Keys
-            $table->foreignId('room_booking_id')->nullable()->constrained('room_bookings')->onDelete('cascade');
-            $table->foreignId('service_booking_id')->nullable()->constrained('service_bookings')->onDelete('cascade');
-            $table->foreignId('admin_id')->nullable()->constrained('users')->onDelete('set null');
-            
+            // Relationships
+            $table->foreignId('processed_by')->nullable()->constrained('users')->onDelete('cascade');
+
+            // Polymorphic (RoomBooking or ServiceBooking)
+            $table->morphs('payable');
+
             // Payment Details
+            $table->string('reference')->unique();
             $table->decimal('amount', 10, 2);
-            $table->date('date');
-            $table->enum('method', ['Cash', 'Card', 'Bank Transfer', 'E-Wallet'])->default('Cash');
-            $table->enum('status', ['Pending', 'Completed', 'Failed', 'Refunded'])->default('Pending');
+            $table->date('paid_at'); 
+            $table->enum('method', ['api', 'cash', 'card', 'bank_transfer', 'e_wallet'])->default('cash');
+            $table->enum('channel', ['online', 'offline'])->default('offline');
+            $table->enum('status', ['completed', 'refunded'])->default('completed');
+
+            // Indexes
+            $table->index('processed_by');
+            $table->index('method');
+            $table->index('status');
+            $table->index('paid_at');
 
             $table->timestamps();
         });

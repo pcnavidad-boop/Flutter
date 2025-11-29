@@ -4,95 +4,121 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Str;
+use Illuminate\Notifications\Notifiable;
+use App\Services\BookingCalculator;
 
 class RoomBooking extends Model
 {
-    
-    use HasFactory;
+    use HasFactory, Notifiable;
 
     protected $fillable = [
+        'reference',
         'guest_name',
         'guest_email',
         'guest_contact',
-        'check_in_date',
-        'check_out_date',
         'number_of_guests',
-        'event_date',
-        'start_time',
-        'end_time',
-        'room_id',
-        'user_id',
+        'start_date',
+        'end_date',
         'total_price',
         'remarks',
         'type',
-        'booking_date',
         'booking_status',
         'payment_status',
         'status_change_reason',
+        'created_by',
     ];
 
-    protected function casts(): array
+    protected $casts = [
+        'total_price'  => 'decimal:2',
+        'booking_date' => 'date',
+        'start_date'   => 'date',
+        'end_date'     => 'date',
+    ];
+
+    protected static function boot()
     {
-        return [
-            'total_price' => 'decimal:2',
-            'check_in_date' => 'date',
-            'check_out_date' => 'date',
-            'event_date' => 'date',
-            'start_time' => 'time',
-            'end_time' => 'time',
-            'booking_date' => 'date',
-        ];
+        parent::boot();
+
+        static::creating(function ($b) {
+            $b->reference = self::uniqueReference();
+            $b->booking_date = now();
+        });
+    }
+
+    private static function uniqueReference(): string
+    {
+        do {
+            $ref = 'RB-' . strtoupper(Str::random(8));
+        } while (self::where('reference', $ref)->exists());
+
+        return $ref;
     }
 
     // Relationships
-
     public function room()
     {
-        return $this->belongsTo(Room::class, 'room_id');
+        return $this->belongsTo(Room::class);
     }
 
-    public function user()
+    public function creator()
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function payment()
+    public function payments()
     {
-        return $this->hasOne(Payment::class, 'room_booking_id');
+        return $this->morphMany(Payment::class, 'payable');
     }
 
-    // Scopes
-    public function scopeConfirmed($query)
+    // Payment calculations
+    public function totalPaymentsCompleted()
     {
-        return $query->where('booking_status', 'Confirmed');
+        return $this->payments()->where('status', 'completed')->sum('amount');
     }
 
-    public function scopeUnpaid($query)
+    public function totalPaymentsRefunded()
     {
-        return $query->where('payment_status', 'Unpaid');
+        return $this->payments()->where('status', 'refunded')->sum('amount');
     }
 
-    public function scopeActive($query)
+    public function getRemainingBalanceAttribute()
     {
-        return $query->whereNotIn('booking_status', ['Cancelled', 'Declined']);
+        return BookingCalculator::remainingBalance($this);
     }
 
     // Accessors
-    public function getFormattedPriceAttribute()
+    public function getPeriodAttribute()
     {
-        return $this->total_price ? number_format($this->total_price, 2) : '0.00';
+        if (!$this->start_date || !$this->end_date) return null;
+        return $this->start_date->format('M d, Y') . ' - ' . $this->end_date->format('M d, Y');
     }
 
-    public function getStayPeriodAttribute()
+    public function getScheduleDisplayAttribute()
     {
-        if ($this->check_in_date && $this->check_out_date) {
-            return $this->check_in_date->format('M d, Y') . ' - ' . $this->check_out_date->format('M d, Y');
-        }
-
-        if ($this->event_date) {
-            return $this->event_date->format('M d, Y');
-        }
-
-        return null;
+        return $this->period;
     }
+
+    public function getIsFunctionBookingAttribute()
+    {
+        return $this->room && $this->room->room_type === 'function';
+    }
+
+    public function getIsStayBookingAttribute()
+    {
+        return $this->room && $this->room->room_type !== 'function';
+    }
+
+    public function routeNotificationForMail(): string
+    {
+        return $this->guest_email;
+    }
+
+    protected $appends = [
+        'period',
+        'schedule_display',
+        'is_function_booking',
+        'is_stay_booking',
+        'remaining_balance',
+    ];
 }
