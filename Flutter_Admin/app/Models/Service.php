@@ -56,10 +56,10 @@ class Service extends Model
 
     public function getRouteKeyName()
     {
-        return 'slug';
+        return request()->is('admin/*') ? 'id' : 'slug';
     }
 
-    // Relationships
+    /* RELATIONSHIPS */
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -70,7 +70,7 @@ class Service extends Model
         return $this->hasMany(ServiceBooking::class);
     }
 
-    // Scopes
+    /* SCOPES */
     public function scopeAvailable($q)
     {
         return $q->where('status', 'available');
@@ -81,37 +81,48 @@ class Service extends Model
         return $q->where('is_archived', false);
     }
 
-    // Mutators
+    /* MUTATORS */
     public function setNameAttribute($value)
     {
         $this->attributes['name'] = ucwords(strtolower($value));
     }
 
-    // Accessors
-    public function getFormattedPriceAttribute()
+    /* ACCESSORS */
+    public function getFormattedBasePriceAttribute()
     {
         return number_format($this->base_price, 2);
+    }
+
+    public function getFormattedPriceTypeAttribute()
+    {
+        return strtolower(str_replace('_', ' ', $this->price_type));
+    }
+
+    public function getPriceLabelAttribute()
+    {
+        return "₱{$this->formatted_base_price} {$this->formatted_price_type}";
     }
 
     public function getScheduleAttribute()
     {
         if (!$this->start_time || !$this->end_time) return null;
-        return $this->start_time->format('H:i') . ' - ' . $this->end_time->format('H:i');
+        return "{$this->start_time} - {$this->end_time}";
     }
 
-    public function getPriceLabelAttribute()
+    public function getStatusBadgeAttribute()
     {
-        return match ($this->price_type) {
-            'per_hour'   => "{$this->formatted_price} / hour",
-            'per_day'    => "{$this->formatted_price} / day",
-            'per_person' => "{$this->formatted_price} / person",
-            default      => $this->formatted_price,
+        return match ($this->status) {
+            'available'   => 'success',
+            'maintenance' => 'warning',
+            default        => 'secondary',
         };
     }
 
     protected $appends = [
-        'formatted_price',
-        'schedule',
+        'formatted_base_price',
+        'formatted_price_type',
         'price_label',
+        'schedule',
+        'status_badge',
     ];
 }

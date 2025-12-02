@@ -7,104 +7,147 @@ use Carbon\Carbon;
 class ItemLifecycleService
 {
     /**
-     * Ensure item (room or service) can be booked.
+     * Ensure item (room or service) is bookable (not archived/under maintenance)
+     *
+     * @param mixed $item
+     * @throws \Exception
      */
     public function assertItemBookable($item): void
     {
-        if (property_exists($item, 'is_archived') && $item->is_archived) {
+        if (isset($item->is_archived) && $item->is_archived) {
             throw new \Exception("This item is archived.");
         }
 
-        if (property_exists($item, 'status') && $item->status === 'maintenance') {
+        if (isset($item->status) && $item->status === 'maintenance') {
             throw new \Exception("This item is under maintenance.");
         }
     }
 
     /**
-     * Ensure item can be updated (not archived).
+     * Ensure item can be updated (not archived)
+     *
+     * @param mixed $item
+     * @throws \Exception
      */
     public function assertItemUpdatable($item): void
     {
-        if (property_exists($item, 'is_archived') && $item->is_archived) {
+        if (isset($item->is_archived) && $item->is_archived) {
             throw new \Exception("Cannot update an archived item.");
         }
     }
 
     /**
-     * Prevent type change if active bookings exist.
+     * Ensure changing the type of an item is allowed (no active bookings with different types)
+     *
+     * @param mixed $item
+     * @param string $newType
+     * @throws \Exception
      */
     public function assertTypeChangeAllowed($item, string $newType): void
     {
-        // Detect model type by class name to check proper column
         $hasActive = $item->bookings()->where('booking_status', '!=', 'cancelled')->exists();
 
         if ($hasActive) {
-            // for services: compare service_type; for rooms: compare room_type
-            if ((property_exists($item, 'service_type') && $newType !== $item->service_type)
-                || (property_exists($item, 'room_type') && $newType !== $item->room_type)) {
+            if ((isset($item->service_type) && $newType !== $item->service_type) ||
+                (isset($item->room_type) && $newType !== $item->room_type)) {
                 throw new \Exception("Cannot change item type while active bookings exist.");
             }
         }
     }
 
     /**
-     * Prevent capacity reduction that would break existing bookings.
+     * Ensure changing capacity won't invalidate existing bookings.
+     *
+     * @param mixed $item
+     * @param int $newCapacity
+     * @throws \Exception
      */
     public function assertCapacityChangeAllowed($item, int $newCapacity): void
     {
         foreach ($item->bookings()->where('booking_status', '!=', 'cancelled')->get() as $b) {
             if ($b->number_of_guests > $newCapacity) {
-                throw new \Exception("Cannot reduce capacity below existing booking of {$b->number_of_guests} guests.");
+                throw new \Exception("Cannot reduce capacity below {$b->number_of_guests} guests from an existing booking.");
             }
         }
     }
 
     /**
-     * Prevent invalid operating hour changes (services only).
+     * Ensure changing operating hours won't break existing bookings (for services).
+     *
+     * @param mixed $service
+     * @param string $newStart  'H:i'
+     * @param string $newEnd    'H:i'
+     * @throws \Exception
      */
     public function assertOperatingHoursChangeAllowed($service, string $newStart, string $newEnd): void
     {
-        $ns = Carbon::parse($newStart);
-        $ne = Carbon::parse($newEnd);
+        try {
+            $ns = Carbon::createFromFormat('H:i', substr($newStart, 0, 5));
+            $ne = Carbon::createFromFormat('H:i', substr($newEnd, 0, 5));
+        } catch (\Throwable $e) {
+            throw new \Exception("Invalid operating hour format.");
+        }
 
-        foreach ($service->bookings()->where('booking_status', '!=', 'cancelled')->get() as $b) {
-            $bs = Carbon::parse($b->start_time);
-            $be = Carbon::parse($b->end_time);
+        if ($ne->lte($ns)) {
+            throw new \Exception("End time must be after start time.");
+        }
+
+        foreach ($service->bookings()->where('booking_status','!=','cancelled')->get() as $b) {
+            if (!$b->start_time || !$b->end_time) {
+                // if booking has no times, skip time-check (or treat as conflict depending on your policy)
+                continue;
+            }
+
+            $bs = Carbon::createFromFormat('H:i', substr($b->start_time, 0, 5));
+            $be = Carbon::createFromFormat('H:i', substr($b->end_time, 0, 5));
 
             if ($bs->lt($ns) || $be->gt($ne)) {
-                throw new \Exception("Cannot change hours: booking {$bs->format('H:i')}–{$be->format('H:i')} is outside new schedule.");
+                throw new \Exception("Existing booking {$bs->format('H:i')}–{$be->format('H:i')} falls outside new operating hours.");
             }
         }
     }
 
     /**
-     * Prevent archiving items with future bookings.
+     * Ensure item may be archived (no future non-cancelled bookings).
+     *
+     * @param mixed $item
+     * @throws \Exception
      */
     public function assertCanArchive($item): void
     {
-        // Distinguish between room-type bookings and service-type bookings.
-        $hasFutureRoomBooking = false;
-        $hasFutureServiceBooking = false;
+        $today = today()->toDateString();
 
-        // Room bookings: start_date
-        if (property_exists($item, 'room_type') || property_exists($item, 'capacity') && method_exists($item, 'bookings')) {
-            $hasFutureRoomBooking = $item->bookings()
+        // If this is a ROOM -----------------------------------------
+        if (isset($item->room_type)) {
+
+            $hasFutureBooking = $item->bookings()
                 ->where('booking_status', '!=', 'cancelled')
-                ->whereDate('start_date', '>=', today())
+                ->whereDate('start_date', '>=', $today)
                 ->exists();
+
+            if ($hasFutureBooking) {
+                throw new \Exception("Cannot archive this room because future bookings exist.");
+            }
+
+            return;
         }
 
-        // Service bookings: appointment_date
-        $hasFutureServiceBooking = $item->bookings()
-            ->where('booking_status', '!=', 'cancelled')
-            ->where(function ($q) {
-                // use appointment_date if present
-                $q->whereDate('appointment_date', '>=', today());
-            })
-            ->exists();
+        // If this is a SERVICE ---------------------------------------
+        if (isset($item->service_type)) {
 
-        if ($hasFutureRoomBooking || $hasFutureServiceBooking) {
-            throw new \Exception("Cannot archive this item because future bookings exist.");
+            $hasFutureBooking = $item->bookings()
+                ->where('booking_status', '!=', 'cancelled')
+                ->whereDate('appointment_date', '>=', $today)
+                ->exists();
+
+            if ($hasFutureBooking) {
+                throw new \Exception("Cannot archive this service because future appointments exist.");
+            }
+
+            return;
         }
+
+        // Unknown item type
+        throw new \Exception("Unknown item type — cannot check archive rules.");
     }
 }

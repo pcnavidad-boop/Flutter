@@ -13,6 +13,7 @@ class RoomRulesService
             'family'    => [2, 3],
             'suite'     => [1, 2],
             'penthouse' => [2, 4],
+            'function'  => [0, 0],
         ];
 
         if (!isset($rules[$type])) {
@@ -21,8 +22,10 @@ class RoomRulesService
 
         [$min, $max] = $rules[$type];
 
+        if ($type === 'function') return;
+
         if ($beds < $min || $beds > $max) {
-            throw new \Exception("{$type} rooms must have between {$min} and {$max} beds.");
+            throw new \Exception("{$type} rooms require {$min}-{$max} beds.");
         }
     }
 
@@ -30,11 +33,12 @@ class RoomRulesService
     {
         $rules = [
             'single'    => [1, 1],
-            'double'    => [2, 2],
+            'double'    => [1, 2],
             'quad'      => [4, 4],
             'family'    => [4, 6],
             'suite'     => [2, 4],
             'penthouse' => [4, 8],
+            'function'  => [1, 10000],
         ];
 
         if (!isset($rules[$type])) {
@@ -44,7 +48,7 @@ class RoomRulesService
         [$min, $max] = $rules[$type];
 
         if ($capacity < $min || $capacity > $max) {
-            throw new \Exception("{$type} room capacity must be {$min}–{$max}.");
+            throw new \Exception("{$type} room capacity must be {$min}-{$max}.");
         }
     }
 }

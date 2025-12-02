@@ -20,6 +20,7 @@ class RoomBooking extends Model
         'number_of_guests',
         'start_date',
         'end_date',
+        'booking_date',
         'total_price',
         'remarks',
         'type',
@@ -27,6 +28,7 @@ class RoomBooking extends Model
         'payment_status',
         'status_change_reason',
         'created_by',
+        'room_id',
     ];
 
     protected $casts = [

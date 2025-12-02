@@ -53,7 +53,7 @@ class Room extends Model
 
     public function getRouteKeyName()
     {
-        return 'slug';
+        return request()->is('admin/*') ? 'id' : 'slug';
     }
 
     // Relationships
@@ -90,15 +90,19 @@ class Room extends Model
     }
 
     // Accessors
-    public function getFormattedPriceAttribute()
+    public function getFormattedBasePriceAttribute()
     {
         return number_format($this->base_price, 2);
     }
 
+    public function getFormattedPriceTypeAttribute()
+    {
+        return strtolower(str_replace('_', ' ', $this->price_type));
+    }
+
     public function getPriceLabelAttribute()
     {
-        return $this->formatted_price .
-            ($this->price_type === 'per_night' ? ' / night' : ' / event');
+        return "₱{$this->formatted_base_price} {$this->formatted_price_type}";
     }
 
     public function getIsFunctionRoomAttribute()
@@ -116,7 +120,8 @@ class Room extends Model
     }
 
     protected $appends = [
-        'formatted_price',
+        'formatted_base_price',
+        'formatted_price_type',
         'price_label',
         'is_function_room',
         'status_badge',

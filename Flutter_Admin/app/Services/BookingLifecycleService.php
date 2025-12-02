@@ -2,12 +2,37 @@
 
 namespace App\Services;
 
+use App\Models\RoomBooking;
+use App\Models\ServiceBooking;
+use Carbon\Carbon;
+
 class BookingLifecycleService
 {
     /**
-     * Ensure booking edit is allowed.
-     *
-     * Throws \Exception on violation.
+     * ----------------------------------------------------------------------
+     *  ITEM VALIDATION (Used by Customer + Webhook + Admin)
+     * ----------------------------------------------------------------------
+     * Ensures the ROOM or SERVICE can be booked (not archived, not in maintenance)
+     */
+    public function assertItemBookable($item): void
+    {
+        if (!$item) {
+            throw new \Exception("Item not found.");
+        }
+
+        if (isset($item->is_archived) && $item->is_archived) {
+            throw new \Exception("This item is archived.");
+        }
+
+        if (isset($item->status) && $item->status === 'maintenance') {
+            throw new \Exception("This item is under maintenance.");
+        }
+    }
+
+    /**
+     * ----------------------------------------------------------------------
+     *  BOOKING EDIT RULES (Admin only)
+     * ----------------------------------------------------------------------
      */
     public function assertBookingEditable($booking): void
     {
@@ -19,29 +44,54 @@ class BookingLifecycleService
             throw new \Exception("Cannot modify booking because payments already exist.");
         }
 
-        // Use payable polymorphic relation if available, else fallback to specific relations
-        $item = $this->getPayableFromBooking($booking);
-
-        if ($item) {
-            if (property_exists($item, 'is_archived') && $item->is_archived) {
-                throw new \Exception("Cannot modify a booking for an archived item.");
-            }
-
-            if (property_exists($item, 'status') && $item->status === 'maintenance') {
-                throw new \Exception("Cannot modify booking while item is under maintenance.");
-            }
-        }
+        $item = $this->resolveItem($booking);
+        $this->assertItemBookable($item);
     }
 
     /**
-     * Validate status transitions (throws on invalid).
+     * ----------------------------------------------------------------------
+     *  PAYMENT VALIDATION (Admin + Customer + Webhook)
+     * ----------------------------------------------------------------------
+     * Replaces old assertBookingPayable and assertBookingEditableForPayment
+     */
+    public function assertBookingPayable($booking): void
+    {
+        if (in_array($booking->booking_status, ['cancelled', 'checked_out', 'completed'])) {
+            throw new \Exception("Cannot add payment to a {$booking->booking_status} booking.");
+        }
+
+        // Ensure related room/service is valid
+        $item = $this->resolveItem($booking);
+        $this->assertItemBookable($item);
+    }
+
+    /**
+     * ----------------------------------------------------------------------
+     *  PAYMENT ROLLBACK VALIDATION (Admin only)
+     * ----------------------------------------------------------------------
+     */
+    public function assertBookingMutableForPaymentRollback($booking): void
+    {
+        if (in_array($booking->booking_status, ['completed', 'checked_out', 'cancelled'])) {
+            throw new \Exception("Cannot rollback payment for a {$booking->booking_status} booking.");
+        }
+
+        $item = $this->resolveItem($booking);
+        $this->assertItemBookable($item);
+    }
+
+    /**
+     * ----------------------------------------------------------------------
+     *  STATUS TRANSITION RULES (Admin only)
+     * ----------------------------------------------------------------------
      */
     public function assertStatusTransition($booking, string $newStatus): void
     {
         $old = $booking->booking_status;
 
         $allowed = [
-            'confirmed' => ['confirmed', 'checked_in', 'cancelled'],
+            'pending'    => ['pending', 'confirmed', 'cancelled'],
+            'confirmed'  => ['confirmed', 'checked_in', 'cancelled'],
             'checked_in' => ['checked_in', 'checked_out'],
         ];
 
@@ -51,43 +101,49 @@ class BookingLifecycleService
     }
 
     /**
-     * Validate date/time logic of an update payload.
+     * ----------------------------------------------------------------------
+     *  DATE & TIME VALIDATION (Admin + Customer)
+     * ----------------------------------------------------------------------
      */
     public function assertValidSchedule(array $data): void
     {
-        if (isset($data['start_date'], $data['end_date']) &&
-            $data['end_date'] < $data['start_date']) {
-            throw new \Exception("End date must be after start date.");
+        // DATE validation
+        if (isset($data['start_date'], $data['end_date'])) {
+            $start = Carbon::parse($data['start_date']);
+            $end   = Carbon::parse($data['end_date']);
+
+            if ($end->lt($start)) {
+                throw new \Exception("End date must be after start date.");
+            }
         }
 
-        if (isset($data['start_time'], $data['end_time']) &&
-            $data['end_time'] <= $data['start_time']) {
-            throw new \Exception("End time must be after start time.");
+        // TIME validation
+        if (isset($data['start_time'], $data['end_time'])) {
+            $start = Carbon::createFromFormat('H:i', substr($data['start_time'], 0, 5));
+            $end   = Carbon::createFromFormat('H:i', substr($data['end_time'], 0, 5));
+
+            if ($end->lte($start)) {
+                throw new \Exception("End time must be after start time.");
+            }
         }
     }
 
     /**
-     * Helper: get the related item to the booking (payable / room / service)
+     * ----------------------------------------------------------------------
+     * Resolve associated item (room or service)
+     * ----------------------------------------------------------------------
      */
-    protected function getPayableFromBooking($booking)
+    private function resolveItem($booking)
     {
-        // Prefer polymorphic relationship 'payable' if exists
-        if (method_exists($booking, 'payable')) {
-            try {
-                return $booking->payable;
-            } catch (\Throwable $e) {
-                // ignore and fallback
-            }
-        }
-
-        if (method_exists($booking, 'room') && $booking->room) {
+        if ($booking instanceof RoomBooking) {
             return $booking->room;
         }
 
-        if (method_exists($booking, 'service') && $booking->service) {
+        if ($booking instanceof ServiceBooking) {
             return $booking->service;
         }
 
         return null;
     }
 }
+

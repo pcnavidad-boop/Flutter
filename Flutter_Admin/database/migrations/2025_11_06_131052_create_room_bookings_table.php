@@ -34,8 +34,8 @@ return new class extends Migration
             $table->string('reference')->unique();
             $table->enum('type', ['website','walk-in','phone','email'])->default('website');
             $table->date('booking_date');
-            $table->enum('booking_status', ['confirmed','checked_in','checked_out','cancelled'])->default('confirmed');
-            $table->enum('payment_status', ['downpayment','fully_paid','refunded'])->default('downpayment');
+            $table->enum('booking_status', ['pending', 'confirmed','checked_in','checked_out','cancelled'])->default('pending');
+            $table->enum('payment_status', ['unpaid', 'downpayment','fully_paid','refunded'])->default('unpaid');
             $table->text('status_change_reason')->nullable();
 
             // Indexes for performance

@@ -7,42 +7,37 @@ use Illuminate\Support\Facades\DB;
 
 class PaymentRollbackService
 {
-    /**
-     * Safely rollback (delete) an offline payment.
-     *
-     * Throws \Exception on violation.
-     */
     public static function rollback(Payment $payment): void
     {
         DB::transaction(function () use ($payment) {
 
             $booking = $payment->payable;
 
-            // Reject Stripe/API payments
-            if ($payment->method === 'api') {
-                throw new \Exception('Stripe (API) payments cannot be deleted.');
+            if (!$booking) {
+                throw new \Exception('Associated booking not found.');
             }
 
-            // Refunded payments cannot be rolled back
+            if ($payment->method === 'api') {
+                throw new \Exception('API payments cannot be deleted.');
+            }
+
             if ($payment->status === 'refunded') {
                 throw new \Exception('Refunded payments cannot be rolled back.');
             }
 
-            // Booking lifecycle restrictions
-            if (in_array($booking->booking_status, ['completed', 'checked_out', 'cancelled'])) {
-                throw new \Exception('Cannot rollback payments for completed or cancelled bookings.');
+            if (in_array($booking->booking_status, ['completed','checked_out','cancelled'])) {
+                throw new \Exception('Cannot rollback payments for finalized bookings.');
             }
 
-            // Cannot rollback if item is archived
-            if (method_exists($booking->payable, 'is_archived') &&
-                $booking->payable->is_archived) {
-                throw new \Exception('Cannot rollback payments for archived items.');
+            $item = $booking instanceof \App\Models\RoomBooking ? $booking->room :
+                    ($booking instanceof \App\Models\ServiceBooking ? $booking->service : null);
+
+            if ($item && isset($item->is_archived) && $item->is_archived) {
+                throw new \Exception('Cannot rollback payment for an archived item.');
             }
 
-            // At this point, delete is permitted — delete and then recalc booking payment status
             $payment->delete();
 
-            // Recalculate booking payment status
             PaymentService::updateBookingPaymentStatus($booking);
         });
     }

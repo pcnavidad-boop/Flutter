@@ -14,14 +14,18 @@ class RouteServiceProvider extends ServiceProvider
     {
         $this->routes(function () {
 
-            // Load API routes
+            // API
             Route::middleware('api')
                 ->prefix('api')
                 ->group(base_path('routes/api.php'));
 
-            // Load web routes
+            // Web
             Route::middleware('web')
                 ->group(base_path('routes/web.php'));
+
+            // Admin
+            Route::middleware(['web'])
+                ->group(base_path('routes/admin.php'));
         });
     }
 }

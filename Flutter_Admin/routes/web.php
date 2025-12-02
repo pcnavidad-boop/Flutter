@@ -1,98 +1,101 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\RoomController;
-use App\Http\Controllers\ServiceController;
-use App\Http\Controllers\RoomBookingController;
-use App\Http\Controllers\ServiceBookingController;
-use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\StripeCheckoutController;
 use Illuminate\Support\Facades\Route;
 
-// Public Pages
+use App\Http\Controllers\Customer\RoomController;
+use App\Http\Controllers\Customer\ServiceController;
+use App\Http\Controllers\Customer\RoomBookingController;
+use App\Http\Controllers\Customer\ServiceBookingController;
+use App\Http\Controllers\Customer\StripeCheckoutController;
+
+/**
+ * PUBLIC LANDING PAGE
+ */
 Route::get('/', fn() => view('welcome'));
 
-// Stripe return pages
-Route::get('/payment/success', fn() => "Payment successful!");
-Route::get('/payment/cancel', fn() => "Payment cancelled.");
-
-// Stripe test UI
-Route::view('/test-checkout', 'test_checkout');
-
-// Guest Payment Routes
-Route::get('/hotel/pay/downpayment/{reference}', [StripeCheckoutController::class, 'payDownpayment'])
-    ->name('guest.pay.downpayment');
-
-Route::get('/hotel/pay/full/{reference}', [StripeCheckoutController::class, 'payFull'])
-    ->name('guest.pay.full');
-
-Route::get('/hotel/pay/remaining/{reference}', [StripeCheckoutController::class, 'payRemaining'])
-    ->name('guest.pay.remaining');
-
-// Guest-Facing Pages
+/**
+ * CUSTOMER-FACING HOTEL ROUTES
+ */
 Route::prefix('hotel')->group(function () {
 
-    Route::get('/', fn() => view('customer.landing'))->name('hotel.landing');
+    Route::get('/', fn() => view('customer.landing'))
+        ->name('hotel.landing');
 
-    Route::get('/rooms', function () {
-        $rooms = \App\Models\Room::active()->available()->get();
-        return view('customer.rooms', compact('rooms'));
-    })->name('hotel.rooms');
+    /**
+     * ROOMS
+     */
+    Route::get('/rooms', [RoomController::class, 'index'])
+        ->name('hotel.rooms');
 
-    Route::get('/services', function () {
-        $services = \App\Models\Service::active()->available()->get();
-        return view('customer.services', compact('services'));
-    })->name('hotel.services');
+    Route::get('/rooms/{room}', [RoomController::class, 'show'])
+        ->name('hotel.room.show');
 
-    Route::get('/book-room', fn() => view('customer.booking-room'))->name('hotel.book.room');
-    Route::get('/book-service', fn() => view('customer.booking-service'))->name('hotel.book.service');
+    /**
+     * BOOK ROOM
+     */
+    Route::get('/book-room/{room}', [RoomBookingController::class, 'createPage'])
+        ->name('hotel.book.room');
+
+    Route::post('/book-room', [RoomBookingController::class, 'store'])
+        ->name('hotel.book.room.store');
+
+    Route::get('/booking/room/{reference}',
+        [RoomBookingController::class, 'summary'])
+        ->name('hotel.booking.room.summary');
+
+    /**
+     * SERVICES
+     */
+    Route::get('/services', [ServiceController::class, 'index'])
+        ->name('hotel.services');
+
+    Route::get('/services/{service}', [ServiceController::class, 'show'])
+        ->name('hotel.service.show');
+
+    /**
+     * BOOK SERVICE
+     */
+    Route::get('/book-service/{service}', [ServiceBookingController::class, 'createPage'])
+        ->name('hotel.book.service');
+
+    Route::post('/book-service', [ServiceBookingController::class, 'store'])
+        ->name('hotel.book.service.store');
+
+    Route::get('/booking/service/{reference}',
+        [ServiceBookingController::class, 'summary'])
+        ->name('hotel.booking.service.summary');
 });
 
-// Admin Routes
-Route::middleware(['auth', 'verified'])->group(function () {
+/**
+ * STRIPE RETURN ROUTES
+ */
+Route::get('/payment/success', [StripeCheckoutController::class, 'success'])
+    ->name('payment.success');
 
-    // Dashboard
-    Route::get('/dashboard', fn() => view('dashboard'))->name('dashboard');
+Route::get('/payment/cancel', [StripeCheckoutController::class, 'cancel'])
+    ->name('payment.cancel');
 
-    // Profile
-    Route::get('/profile',  [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile',[ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile',[ProfileController::class, 'destroy'])->name('profile.destroy');
+/**
+ * STRIPE PAYMENT ROUTES
+ */
+Route::get('/hotel/pay/downpayment/{reference}',
+    [StripeCheckoutController::class, 'payDownpayment'])
+    ->name('guest.pay.downpayment');
 
-    // Rooms
-    Route::get('/rooms',            [RoomController::class, 'index'])->name('room.index_page');
-    Route::post('/rooms',           [RoomController::class, 'create'])->name('room.store_data');
-    Route::put('/rooms/{room}',     [RoomController::class, 'update'])->name('room.update_data');
+Route::get('/hotel/pay/full/{reference}',
+    [StripeCheckoutController::class, 'payFull'])
+    ->name('guest.pay.full');
 
-    // Archive toggle
-    Route::patch('/rooms/{room}/archive', [RoomController::class, 'archive'])->name('room.archive');
+Route::get('/hotel/pay/remaining/{reference}',
+    [StripeCheckoutController::class, 'payRemaining'])
+    ->name('guest.pay.remaining');
 
-    // Services
-    Route::get('/services',           [ServiceController::class, 'index'])->name('service.index_page');
-    Route::post('/services',          [ServiceController::class, 'create'])->name('service.store_data');
-    Route::put('/services/{service}', [ServiceController::class, 'update'])->name('service.update_data');
+// ADMIN DASHBOARD REDIRECT
+Route::get('/dashboard', function () {
+    return redirect()->route('admin.dashboard');
+})->name('dashboard');
 
-    // Archive toggle
-    Route::patch('/services/{service}/archive', [ServiceController::class, 'archive'])->name('service.archive');
-
-    // Room Bookings 
-    Route::get('/room-bookings/create',      [RoomBookingController::class, 'viewCreatePage'])->name('room_booking.create');
-    Route::get('/room-bookings',            [RoomBookingController::class, 'index'])->name('room_booking.index_page');
-    Route::post('/room-bookings',           [RoomBookingController::class, 'create'])->name('room_booking.store_data');
-    Route::get('/room-bookings/{roomBooking}', [RoomBookingController::class, 'show'])->name('room_booking.show');
-    Route::put('/room-bookings/{roomBooking}', [RoomBookingController::class, 'update'])->name('room_booking.update_data');
-
-    // Service Bookings
-    Route::get('/service-bookings/create', [ServiceBookingController::class, 'viewCreatePage'])->name('service_booking.create');
-    Route::get('/service-bookings',       [ServiceBookingController::class, 'index'])->name('service_booking.index_page');
-    Route::post('/service-bookings',      [ServiceBookingController::class, 'create'])->name('service_booking.store_data');
-    Route::get('/service-bookings/{serviceBooking}', [ServiceBookingController::class, 'show'])->name('service_booking.show');
-    Route::put('/service-bookings/{serviceBooking}', [ServiceBookingController::class, 'update'])->name('service_booking.update_data');
-
-    // Payments
-    Route::get('/payments',              [PaymentController::class, 'index'])->name('payment.index_page');
-    Route::post('/payments',             [PaymentController::class, 'create'])->name('payment.store_data');
-    Route::delete('/payments/{payment}', [PaymentController::class, 'destroy'])->name('payment.delete_data');
-});
-
-require __DIR__.'/auth.php';
+/**
+ * AUTH
+ */
+require __DIR__ . '/auth.php';

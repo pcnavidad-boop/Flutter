@@ -21,6 +21,7 @@ class ServiceBooking extends Model
         'appointment_date',
         'start_time',
         'end_time',
+        'booking_date',
         'total_price',
         'remarks',
         'type',
@@ -28,6 +29,7 @@ class ServiceBooking extends Model
         'payment_status',
         'status_change_reason',
         'created_by',
+        'service_id',
     ];
 
     protected $casts = [
@@ -97,12 +99,14 @@ class ServiceBooking extends Model
 
     public function getServiceScheduleAttribute()
     {
-        if (!$this->appointment_date) return 'No date selected';
+        if (!$this->appointment_date) {
+            return 'No date selected';
+        }
 
         $date = $this->appointment_date->format('M d, Y');
 
         if ($this->start_time && $this->end_time) {
-            return "{$date} ({$this->start_time->format('H:i')} - {$this->end_time->format('H:i')})";
+            return "{$date} ({$this->start_time} - {$this->end_time})";
         }
 
         return $date;

@@ -21,8 +21,8 @@ return new class extends Migration
             $table->string('name')->unique();
             $table->string('room_number')->unique();
             $table->enum('room_type', ['single','double','quad','family','suite','penthouse','function']);            
-            $table->text('description');     
-            $table->string('image');         
+            $table->text('description')->nullable();     
+            $table->string('image')->nullable();         
             $table->string('slug')->unique();
 
             // Pricing
@@ -31,9 +31,9 @@ return new class extends Migration
 
             // Capacity
             $table->unsignedSmallInteger('number_of_beds')->nullable();
-            $table->unsignedSmallInteger('capacity');
+            $table->unsignedSmallInteger('capacity')->nullable();
 
-            // Availability (occupancy now computed dynamically)
+            // Availability 
             $table->enum('status', ['available', 'maintenance'])->default('available');
 
             // Archive Status

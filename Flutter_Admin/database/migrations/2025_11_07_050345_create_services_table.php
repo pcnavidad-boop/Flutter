@@ -19,10 +19,10 @@ return new class extends Migration
 
             // Service Identification
             $table->string('name')->unique();
-            $table->string('location');
+            $table->string('location')->nullable();
             $table->enum('service_type', ['restaurant','spa','gym','swimming_pool','bar']);
-            $table->text('description'); 
-            $table->string('image');     
+            $table->text('description')->nullable();
+            $table->string('image')->nullable();    
             $table->string('slug')->unique();
 
             // Pricing
@@ -30,13 +30,13 @@ return new class extends Migration
             $table->decimal('base_price', 10, 2)->default(0);
 
             // Capacity
-            $table->unsignedSmallInteger('capacity')->default(1);
+            $table->unsignedSmallInteger('capacity')->nullable();
 
             // Operating Hours
             $table->time('start_time');
             $table->time('end_time');
 
-            // Availability (occupancy now computed dynamically)
+            // Availability 
             $table->enum('status', ['available', 'maintenance'])->default('available');
 
             // Archive Status
