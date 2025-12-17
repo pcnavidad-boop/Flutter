@@ -27,7 +27,6 @@ class ServiceController extends Controller
     {
         $q = Service::query();
 
-        // Search (name, location)
         if ($s = $request->input('search')) {
             $q->where(function($sub) use ($s) {
                 $sub->where('name', 'like', "%{$s}%")
@@ -35,17 +34,14 @@ class ServiceController extends Controller
             });
         }
 
-        // Type filter
         if ($type = $request->input('type')) {
             $q->where('service_type', $type);
         }
 
-        // Status filter
         if ($status = $request->input('status')) {
             $q->where('status', $status);
         }
 
-        // Archived filter (0 or 1)
         if ($request->has('archived') && $request->input('archived') !== '') {
             $q->where('is_archived', (bool) $request->input('archived'));
         }
@@ -65,13 +61,16 @@ class ServiceController extends Controller
             'service_type'       => $service->service_type,
             'description'        => $service->description,
             'capacity'           => $service->capacity,
-            'price_type'         => $service->formatted_price_type,
-            'base_price'         => $service->formatted_base_price,
+            'price_type'         => $service->price_type,
+            'base_price'         => $service->base_price,
+            'formatted_price_type' => $service->formatted_price_type,
+            'formatted_base_price' => $service->formatted_base_price,
+            'price_label'        => $service->price_label,
             'start_time'         => substr($service->start_time, 0, 5),
             'end_time'           => substr($service->end_time, 0, 5),
             'status'             => $service->status,
             'is_archived'        => $service->is_archived,
-            'image_url'          => asset('storage/' . $service->image),
+            'image_url'          => $service->image ? asset('storage/' . $service->image) : null,
             'created_at'         => $service->created_at->format('M d, Y h:i A'),
         ]);
     }
@@ -79,41 +78,44 @@ class ServiceController extends Controller
     // Create a new service
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'name'         => ['required','string','max:255', Rule::unique('services','name')->where(fn($q) => $q->where('is_archived', false))],
-            'service_type' => 'required|in:restaurant,spa,gym,swimming_pool,bar',
-            'description'  => 'nullable|string|max:1000',
-            'location'     => 'nullable|string|max:255',
-            'capacity'     => 'nullable|integer|min:1',
-            'base_price'   => 'required|numeric|min:0|max:999999.99',
-            'start_time'   => 'required|date_format:H:i',
-            'end_time'     => 'required|date_format:H:i|after:start_time',
-            'image'        => 'required|image|mimes:jpg,jpeg,png,webp|max:2048',
-        ]);
+        try {
+            $data = $request->validate([
+                'name'         => ['required','string','max:255', Rule::unique('services','name')->where(fn($q) => $q->where('is_archived', false))],
+                'service_type' => 'required|in:restaurant,spa,gym,swimming_pool,bar',
+                'description'  => 'nullable|string|max:1000',
+                'location'     => 'nullable|string|max:255',
+                'capacity'     => 'nullable|integer|min:1|max:100',
+                'base_price'   => 'required|numeric|min:0|max:999999.99',
+                'start_time'   => 'required|date_format:H:i',
+                'end_time'     => 'required|date_format:H:i|after:start_time',
+                'image'        => 'required|image|mimes:jpg,jpeg,png,webp|max:2048',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()
+                ->withErrors($e->errors(), 'addService')
+                ->withInput()
+                ->with('open_add_modal', true);
+        }
 
         $type = $data['service_type'];
 
-        // Choose price_type here (same approach as rooms)
-        if ($type === 'spa') {
-            $data['price_type'] = 'per_hour';
-        } elseif (in_array($type, ['restaurant','bar'])) {
-            $data['price_type'] = 'per_person';
-        } else {
-            $data['price_type'] = 'per_day';
-        }
+        $data['price_type'] = 'per_person';
 
         try {
+            // Validate capacity (throws) and operating hours (now requires service type)
             $data['capacity'] = $this->rules->validateCapacity($type, $request->capacity ?? null);
-            $this->rules->validateOperatingHours($data['start_time'], $data['end_time']);
+            $this->rules->validateOperatingHours($data['start_time'], $data['end_time'], $type);
         } catch (\Exception $e) {
-            return back()->withErrors(['error' => $e->getMessage()])->withInput();
+            // Map validation message to the time fields for clarity (so the time inputs get highlighted)
+            return back()
+                ->withErrors(['start_time' => $e->getMessage()], 'addService')
+                ->withInput()
+                ->with('open_add_modal', true);
         }
 
-        /* Store image */
         $data['image'] = $request->file('image')->store('service_images', 'public');
-
-        $data['created_by']  = auth()->id();
-        $data['status']      = 'available';
+        $data['created_by'] = auth()->id();
+        $data['status'] = 'available';
         $data['is_archived'] = false;
 
         Service::create($data);
@@ -126,62 +128,68 @@ class ServiceController extends Controller
     public function update(Request $request, Service $service)
     {
         if ($service->is_archived) {
-            return back()->withErrors(['error' => 'Cannot update an archived service.'])->withInput();
-        }
-
-        $data = $request->validate([
-            'name'         => ['required','string','max:255', Rule::unique('services','name')->where(fn($q) => $q->where('is_archived', false))->ignore($service->id)],
-            'service_type' => 'required|in:restaurant,spa,gym,swimming_pool,bar',
-            'description'  => 'nullable|string|max:1000',
-            'location'     => 'nullable|string|max:255',
-            'capacity'     => 'nullable|integer|min:1',
-            'base_price'   => 'required|numeric|min:0|max:999999.99',
-            'start_time'   => 'required|date_format:H:i',
-            'end_time'     => 'required|date_format:H:i|after:start_time',
-            'image'        => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-            'status'       => 'required|in:available,maintenance',
-        ]);
-
-        $type = $data['service_type'];
-        $activeBookings = $service->bookings()->where('booking_status','!=','cancelled')->get();
-
-        if ($activeBookings->count() > 0 && $type !== $service->service_type) {
-            return back()->withErrors(['service_type' => 'Cannot change service type while bookings exist.'])->withInput();
-        }
-
-        // Choose price_type like store()
-        if ($type === 'spa') {
-            $data['price_type'] = 'per_hour';
-        } elseif (in_array($type, ['restaurant','bar'])) {
-            $data['price_type'] = 'per_person';
-        } else {
-            $data['price_type'] = 'per_day';
+            return back()
+                ->withErrors(['error' => 'Cannot update an archived service.'], 'editService')
+                ->with('edit_id', $service->id);
         }
 
         try {
-            $newCap = $this->rules->validateCapacity($type, $request->capacity ?? null);
-            $this->rules->validateOperatingHours($data['start_time'], $data['end_time']);
+            $data = $request->validate([
+                'name'         => ['required','string','max:255', Rule::unique('services','name')->where(fn($q) => $q->where('is_archived', false))->ignore($service->id)],
+                'service_type' => 'required|in:restaurant,spa,gym,swimming_pool,bar',
+                'description'  => 'nullable|string|max:1000',
+                'location'     => 'nullable|string|max:255',
+                'capacity'     => 'nullable|integer|min:1|max:100',
+                'base_price'   => 'required|numeric|min:0|max:999999.99',
+                'start_time'   => 'required|date_format:H:i',
+                'end_time'     => 'required|date_format:H:i|after:start_time',
+                'image'        => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+                'status'       => 'required|in:available,maintenance',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()
+                ->withErrors($e->errors(), 'editService')
+                ->withInput()
+                ->with('edit_id', $service->id);
+        }
+
+        $type = $data['service_type'];
+        $activeBookings = $service->bookings()->where('booking_status', '!=', 'cancelled')->get();
+
+        if ($activeBookings->count() > 0 && $type !== $service->service_type) {
+            return back()
+                ->withErrors(['service_type' => 'Cannot change service type while bookings exist.'], 'editService')
+                ->withInput()
+                ->with('edit_id', $service->id);
+        }
+
+        $data['price_type'] = 'per_person';
+
+        try {
+            $newCapacity = $this->rules->validateCapacity($type, $request->capacity);
+            $this->rules->validateOperatingHours($data['start_time'], $data['end_time'], $type);
 
             foreach ($activeBookings as $b) {
-                if ($b->number_of_guests > $newCap) {
-                    return back()->withErrors(['capacity' =>
-                        "Cannot reduce capacity below existing booking of {$b->number_of_guests} guests."
-                    ])->withInput();
+                if ($b->number_of_guests > $newCapacity) {
+                    return back()
+                        ->withErrors(['capacity' => "Cannot reduce capacity below existing booking of {$b->number_of_guests} guests."], 'editService')
+                        ->withInput()
+                        ->with('edit_id', $service->id);
                 }
             }
 
-            $data['capacity'] = $newCap;
+            $data['capacity'] = $newCapacity;
         } catch (\Exception $e) {
-            return back()->withErrors(['error' => $e->getMessage()])->withInput();
+            // map to start_time so the time fields get highlighted in the modal
+            return back()
+                ->withErrors(['start_time' => $e->getMessage()], 'editService')
+                ->withInput()
+                ->with('edit_id', $service->id);
         }
 
         if ($request->hasFile('image')) {
             $new = $request->file('image')->store('service_images', 'public');
-
-            if ($service->image) {
-                Storage::disk('public')->delete($service->image);
-            }
-
+            Storage::disk('public')->delete($service->image);
             $data['image'] = $new;
         }
 

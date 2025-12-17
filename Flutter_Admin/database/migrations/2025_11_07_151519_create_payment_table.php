@@ -23,7 +23,7 @@ return new class extends Migration
             // Payment Details
             $table->string('reference')->unique();
             $table->decimal('amount', 10, 2);
-            $table->date('paid_at'); 
+            $table->dateTime('paid_at'); 
             $table->enum('method', ['api', 'cash', 'card', 'bank_transfer', 'e_wallet'])->default('cash');
             $table->enum('channel', ['online', 'offline'])->default('offline');
             $table->enum('status', ['completed', 'refunded'])->default('completed');
@@ -31,8 +31,7 @@ return new class extends Migration
             // Indexes
             $table->index('processed_by');
             $table->index('method');
-            $table->index('status');
-            $table->index('paid_at');
+            $table->index(['status', 'paid_at']);
 
             $table->timestamps();
         });

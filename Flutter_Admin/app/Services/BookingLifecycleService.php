@@ -10,9 +10,8 @@ class BookingLifecycleService
 {
     /**
      * ----------------------------------------------------------------------
-     *  ITEM VALIDATION (Used by Customer + Webhook + Admin)
+     * ITEM VALIDATION
      * ----------------------------------------------------------------------
-     * Ensures the ROOM or SERVICE can be booked (not archived, not in maintenance)
      */
     public function assertItemBookable($item): void
     {
@@ -31,12 +30,12 @@ class BookingLifecycleService
 
     /**
      * ----------------------------------------------------------------------
-     *  BOOKING EDIT RULES (Admin only)
+     * BOOKING EDIT RULES
      * ----------------------------------------------------------------------
      */
     public function assertBookingEditable($booking): void
     {
-        if (in_array($booking->booking_status, ['cancelled', 'checked_out', 'completed'])) {
+        if (in_array($booking->booking_status, ['cancelled','checked_out','completed'])) {
             throw new \Exception("Cannot modify a {$booking->booking_status} booking.");
         }
 
@@ -44,45 +43,40 @@ class BookingLifecycleService
             throw new \Exception("Cannot modify booking because payments already exist.");
         }
 
-        $item = $this->resolveItem($booking);
-        $this->assertItemBookable($item);
+        $this->assertItemBookable($this->resolveItem($booking));
     }
 
     /**
      * ----------------------------------------------------------------------
-     *  PAYMENT VALIDATION (Admin + Customer + Webhook)
+     * PAYMENT VALIDATION
      * ----------------------------------------------------------------------
-     * Replaces old assertBookingPayable and assertBookingEditableForPayment
      */
     public function assertBookingPayable($booking): void
     {
-        if (in_array($booking->booking_status, ['cancelled', 'checked_out', 'completed'])) {
+        if (in_array($booking->booking_status, ['cancelled','checked_out','completed'])) {
             throw new \Exception("Cannot add payment to a {$booking->booking_status} booking.");
         }
 
-        // Ensure related room/service is valid
-        $item = $this->resolveItem($booking);
-        $this->assertItemBookable($item);
+        $this->assertItemBookable($this->resolveItem($booking));
     }
 
     /**
      * ----------------------------------------------------------------------
-     *  PAYMENT ROLLBACK VALIDATION (Admin only)
+     * PAYMENT ROLLBACK VALIDATION
      * ----------------------------------------------------------------------
      */
     public function assertBookingMutableForPaymentRollback($booking): void
     {
-        if (in_array($booking->booking_status, ['completed', 'checked_out', 'cancelled'])) {
+        if (in_array($booking->booking_status, ['completed','checked_out','cancelled'])) {
             throw new \Exception("Cannot rollback payment for a {$booking->booking_status} booking.");
         }
 
-        $item = $this->resolveItem($booking);
-        $this->assertItemBookable($item);
+        $this->assertItemBookable($this->resolveItem($booking));
     }
 
     /**
      * ----------------------------------------------------------------------
-     *  STATUS TRANSITION RULES (Admin only)
+     * STATUS TRANSITIONS
      * ----------------------------------------------------------------------
      */
     public function assertStatusTransition($booking, string $newStatus): void
@@ -90,9 +84,9 @@ class BookingLifecycleService
         $old = $booking->booking_status;
 
         $allowed = [
-            'pending'    => ['pending', 'confirmed', 'cancelled'],
-            'confirmed'  => ['confirmed', 'checked_in', 'cancelled'],
-            'checked_in' => ['checked_in', 'checked_out'],
+            'pending'    => ['pending','confirmed','cancelled'],
+            'confirmed'  => ['confirmed','checked_in','cancelled'],
+            'checked_in' => ['checked_in','checked_out'],
         ];
 
         if (!isset($allowed[$old]) || !in_array($newStatus, $allowed[$old])) {
@@ -102,12 +96,29 @@ class BookingLifecycleService
 
     /**
      * ----------------------------------------------------------------------
-     *  DATE & TIME VALIDATION (Admin + Customer)
+     * 🚫 CANCEL RULE — REFUND REQUIRED
+     * ----------------------------------------------------------------------
+     */
+    public function assertCancelable($booking): void
+    {
+        if (
+            $booking->payments()
+                ->where('status', 'completed')
+                ->exists()
+        ) {
+            throw new \Exception(
+                'Refund payments before cancelling this booking.'
+            );
+        }
+    }
+
+    /**
+     * ----------------------------------------------------------------------
+     * DATE & TIME VALIDATION
      * ----------------------------------------------------------------------
      */
     public function assertValidSchedule(array $data): void
     {
-        // DATE validation
         if (isset($data['start_date'], $data['end_date'])) {
             $start = Carbon::parse($data['start_date']);
             $end   = Carbon::parse($data['end_date']);
@@ -117,7 +128,6 @@ class BookingLifecycleService
             }
         }
 
-        // TIME validation
         if (isset($data['start_time'], $data['end_time'])) {
             $start = Carbon::createFromFormat('H:i', substr($data['start_time'], 0, 5));
             $end   = Carbon::createFromFormat('H:i', substr($data['end_time'], 0, 5));
@@ -130,7 +140,7 @@ class BookingLifecycleService
 
     /**
      * ----------------------------------------------------------------------
-     * Resolve associated item (room or service)
+     * Resolve associated item
      * ----------------------------------------------------------------------
      */
     private function resolveItem($booking)
@@ -146,4 +156,3 @@ class BookingLifecycleService
         return null;
     }
 }
-

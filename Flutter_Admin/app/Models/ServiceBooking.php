@@ -27,7 +27,6 @@ class ServiceBooking extends Model
         'type',
         'booking_status',
         'payment_status',
-        'status_change_reason',
         'created_by',
         'service_id',
     ];
@@ -97,19 +96,45 @@ class ServiceBooking extends Model
         return number_format($this->total_price ?? 0, 2);
     }
 
-    public function getServiceScheduleAttribute()
+    /**
+     * Get formatted time slot (e.g., "14:00 - 15:00")
+     */
+    public function getTimeSlotAttribute()
     {
-        if (!$this->appointment_date) {
-            return 'No date selected';
+        if (!$this->start_time || !$this->end_time) {
+            return null;
         }
+        return substr($this->start_time, 0, 5) . ' - ' . substr($this->end_time, 0, 5);
+    }
 
-        $date = $this->appointment_date->format('M d, Y');
+    public function getBookingStatusBadgeAttribute()
+    {
+        return [
+            'pending'     => 'bg-warning text-dark',
+            'confirmed'   => 'bg-success',
+            'completed'   => 'bg-info text-dark',
+            'cancelled'   => 'bg-secondary',
+        ][$this->booking_status] ?? 'bg-light text-dark';
+    }
 
-        if ($this->start_time && $this->end_time) {
-            return "{$date} ({$this->start_time} - {$this->end_time})";
-        }
+    public function getBookingStatusLabelAttribute()
+    {
+        return ucfirst(str_replace('_', ' ', $this->booking_status));
+    }
 
-        return $date;
+    public function getPaymentStatusBadgeAttribute()
+    {
+        return [
+            'unpaid'      => 'bg-secondary',
+            'downpayment' => 'bg-info text-dark',
+            'fully_paid'  => 'bg-success',
+            'refunded'    => 'bg-danger',
+        ][$this->payment_status] ?? 'bg-light text-dark';
+    }
+
+    public function getPaymentStatusLabelAttribute()
+    {
+        return ucfirst(str_replace('_', ' ', $this->payment_status));
     }
 
     public function routeNotificationForMail(): string
@@ -119,7 +144,11 @@ class ServiceBooking extends Model
 
     protected $appends = [
         'formatted_price',
-        'service_schedule',
         'remaining_balance',
+        'time_slot',
+        'booking_status_badge',
+        'booking_status_label',
+        'payment_status_badge',
+        'payment_status_label',
     ];
 }

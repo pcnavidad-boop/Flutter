@@ -26,8 +26,8 @@ return new class extends Migration
             $table->string('slug')->unique();
 
             // Pricing
-            $table->enum('price_type', ['per_night', 'per_event_per_day']);
-            $table->decimal('base_price', 10, 2)->default(0);
+            $table->enum('price_type', ['per_night', 'per_day']);
+            $table->decimal('base_price', 8, 2)->default(0);
 
             // Capacity
             $table->unsignedSmallInteger('number_of_beds')->nullable();
@@ -43,8 +43,7 @@ return new class extends Migration
             $table->index('created_by');
             $table->index('room_type');
             $table->index('price_type');
-            $table->index('status');
-            $table->index('is_archived');
+            $table->index(['status', 'is_archived']);
 
             $table->timestamps();
         });

@@ -74,4 +74,27 @@ class PaymentService
     {
         return BookingCalculator::remainingBalance($booking);
     }
+
+    public static function listOpenBookings(string $type): array
+    {
+        $model = match ($type) {
+            'room'    => \App\Models\RoomBooking::class,
+            'service' => \App\Models\ServiceBooking::class,
+            default   => null,
+        };
+
+        if (!$model) return [];
+
+        return $model::whereNotIn(
+                'booking_status',
+                ['completed','checked_out','cancelled']
+            )
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(fn ($b) => [
+                'reference' => $b->reference,
+                'label'     => $b->guest_name ?? '—',
+            ])
+            ->toArray();
+    }
 }

@@ -3,104 +3,126 @@
 namespace App\Http\Controllers\Customer;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Models\Service;
 use App\Models\ServiceBooking;
-use App\Services\BookingCalculator;
-use App\Services\ConflictDetectionService;
-use App\Services\BookingLifecycleService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class ServiceBookingController extends Controller
 {
-    protected ConflictDetectionService $conflict;
-    protected BookingLifecycleService $lifecycle;
-
-    public function __construct(
-        ConflictDetectionService $conflict,
-        BookingLifecycleService $lifecycle
-    ) {
-        $this->conflict = $conflict;
-        $this->lifecycle = $lifecycle;
-    }
-
-    public function createPage(Request $request)
+    /**
+     * Show service booking form
+     */
+    public function createPage(Service $service, Request $request)
     {
-        $services = Service::active()->available()->orderBy('name')->get();
-        $selectedService = $request->service_id ? Service::find($request->service_id) : null;
+        // Always required
+        if (
+            !$request->appointment_date ||
+            !$request->guests
+        ) {
+            return redirect()
+                ->route('hotel.service.show', $service)
+                ->with('error', 'Please select date and guests first.');
+        }
 
-        return view('customer.bookings.service.create', compact('services', 'selectedService'));
+        // Only required for time-based services
+        if (
+            in_array($service->service_type, ['spa', 'restaurant', 'bar']) &&
+            (
+                !$request->start_time ||
+                !$request->end_time
+            )
+        ) {
+            return redirect()
+                ->route('hotel.service.show', $service)
+                ->with('error', 'Please select a time slot first.');
+        }
+
+        return view('customer.bookings.service.create', [
+            'service' => $service,
+            'appointment_date' => $request->appointment_date,
+            'start_time' => $request->start_time,
+            'end_time' => $request->end_time,
+            'guests' => $request->guests,
+        ]);
     }
 
+    /**
+     * Store service booking
+     */
     public function store(Request $request)
     {
         $data = $request->validate([
-            'guest_name'       => 'required|string|max:255',
-            'guest_email'      => 'required|email|max:255',
-            'guest_contact'    => 'nullable|string|max:50',
-            'service_id'       => 'required|exists:services,id',
-            'appointment_date' => 'required|date',
-            'start_time'       => 'required|date_format:H:i',
-            'end_time'         => 'required|date_format:H:i|after:start_time',
-            'number_of_guests' => 'required|integer|min:1',
-            'remarks'          => 'nullable|string|max:2000',
+            'service_id'        => 'required|exists:services,id',
+            'guest_name'        => 'required|string|max:255',
+            'guest_email'       => 'required|email|max:255',
+            'guest_contact'     => 'nullable|string|max:11',
+            'appointment_date'  => 'required|date',
+            'start_time'        => 'required|string',
+            'end_time'          => 'required|string',
+            'number_of_guests'  => 'required|integer|min:1',
+            'remarks'           => 'nullable|string|max:1000',
         ]);
 
         $service = Service::findOrFail($data['service_id']);
 
+        // Capacity check
+        if ($data['number_of_guests'] > ($service->capacity ?? PHP_INT_MAX)) {
+            return back()
+                ->withErrors([
+                    'number_of_guests' =>
+                        "This service supports up to {$service->capacity} guests."
+                ])
+                ->withInput();
+        }
+
         try {
-            $this->lifecycle->assertItemBookable($service);
-        } catch (\Exception $e) {
-            return back()->withErrors(['service_id' => $e->getMessage()]);
-        }
-
-        // Operating hours
-        if ($data['start_time'] < $service->start_time ||
-            $data['end_time'] > $service->end_time) {
-            return back()->withErrors([
-                'start_time' => "Appointment must be within operating hours: {$service->start_time} - {$service->end_time}",
+            $booking = ServiceBooking::create([
+                'reference'         => strtoupper(Str::random(10)),
+                'service_id'        => $service->id,
+                'guest_name'        => $data['guest_name'],
+                'guest_email'       => $data['guest_email'],
+                'guest_contact'     => $data['guest_contact'],
+                'appointment_date'  => Carbon::parse($data['appointment_date']),
+                'start_time'        => $data['start_time'],
+                'end_time'          => $data['end_time'],
+                'number_of_guests'  => $data['number_of_guests'],
+                'total_price'       => $service->base_price,
+                'booking_status'    => 'confirmed',
+                'remarks'           => $data['remarks'] ?? null,
             ]);
-        }
-
-        // Capacity
-        if (in_array($service->service_type, ['restaurant', 'bar', 'spa']) &&
-            $data['number_of_guests'] > $service->capacity) {
-            return back()->withErrors([
-                'number_of_guests' => "Maximum {$service->capacity} guests allowed.",
+        } catch (\Throwable $e) {
+            Log::error('Service booking failed', [
+                'error'      => $e->getMessage(),
+                'service_id'=> $service->id,
             ]);
+
+            return back()
+                ->withErrors([
+                    'error' => 'Unable to complete booking. Please try again.'
+                ])
+                ->withInput();
         }
 
-        // Conflict Check
-        if ($this->conflict->serviceHasConflict($service, $data)) {
-            return back()->withErrors([
-                'appointment_date' => "This service is fully booked at the specified time.",
-            ]);
-        }
-
-        // CREATE BOOKING (pending)
-        $booking = new ServiceBooking();
-        $booking->fill($data);
-        $booking->reference = ServiceBooking::generateReference();
-        $booking->booking_status = 'pending';
-        $booking->payment_status = 'unpaid';
-        $booking->type = 'website';
-        $booking->created_by = null;
-        $booking->save();
-
-        // Compute total
-        $booking->total_price = BookingCalculator::computeTotal($booking);
-        $booking->save();
-
-        return redirect()->route('hotel.booking.service.summary', $booking->reference)
-            ->with('success', 'Booking saved! Please proceed to payment.');
+        return redirect()->route(
+            'hotel.book.service.summary',
+            $booking->reference
+        );
     }
 
-    public function summary($reference)
+    /**
+     * Booking summary
+     */
+    public function summary(string $reference)
     {
-        $booking = ServiceBooking::with('service')
-            ->where('reference', $reference)
+        $booking = ServiceBooking::where('reference', $reference)
+            ->with('service')
             ->firstOrFail();
 
-        return view('customer.bookings.service.summary', compact('booking'));
+        return view('customer.bookings.service.summary', [
+            'booking' => $booking,
+        ]);
     }
 }

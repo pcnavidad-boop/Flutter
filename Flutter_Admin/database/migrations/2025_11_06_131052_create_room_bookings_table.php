@@ -36,17 +36,15 @@ return new class extends Migration
             $table->date('booking_date');
             $table->enum('booking_status', ['pending', 'confirmed','checked_in','checked_out','cancelled'])->default('pending');
             $table->enum('payment_status', ['unpaid', 'downpayment','fully_paid','refunded'])->default('unpaid');
-            $table->text('status_change_reason')->nullable();
 
             // Indexes for performance
             $table->index('room_id');
             $table->index('created_by');
-            $table->index('booking_status');
             $table->index('payment_status');
             $table->index('start_date');
             $table->index('end_date');
-            $table->index('booking_date');
             $table->index(['room_id', 'start_date', 'end_date']);
+            $table->index(['booking_status', 'booking_date']);
 
             $table->timestamps();
         });

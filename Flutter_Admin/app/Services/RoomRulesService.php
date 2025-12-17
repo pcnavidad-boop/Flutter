@@ -38,7 +38,7 @@ class RoomRulesService
             'family'    => [4, 6],
             'suite'     => [2, 4],
             'penthouse' => [4, 8],
-            'function'  => [1, 10000],
+            'function'  => [1, 500],
         ];
 
         if (!isset($rules[$type])) {

@@ -3,63 +3,80 @@
     <!-- PAGE TITLE -->
     <h2 class="fw-bold mb-3" style="color: var(--accent-brown-deep);">Services</h2>
 
-    <!-- SEARCH + FILTER BAR -->
+    <!-- SEARCH + FILTER BAR CARD -->
     <div class="content-card mb-4">
+
         <form method="GET"
               action="{{ route('admin.services.index') }}"
-              class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+              class="filter-bar">
 
-            <div class="d-flex align-items-center flex-wrap gap-2 filter-row">
+            <!-- LEFT SIDE FILTERS -->
+            <div class="filter-controls">
 
+                <!-- SEARCH -->
                 <input type="text"
                        name="search"
                        value="{{ request('search') }}"
-                       class="form-control rounded-pill filter-input"
+                       class="form-control rounded-pill"
                        placeholder="Search services...">
 
-                <select name="type" class="form-select rounded-pill filter-input">
+                <!-- TYPE -->
+                <select name="type" class="form-select rounded-pill">
                     <option value="">All Types</option>
-                    <option value="restaurant"      {{ request('type')=='restaurant'?'selected':'' }}>Restaurant</option>
-                    <option value="spa"             {{ request('type')=='spa'?'selected':'' }}>Spa</option>
-                    <option value="gym"             {{ request('type')=='gym'?'selected':'' }}>Gym</option>
-                    <option value="swimming_pool"   {{ request('type')=='swimming_pool'?'selected':'' }}>Swimming Pool</option>
-                    <option value="bar"             {{ request('type')=='bar'?'selected':'' }}>Bar</option>
+                    @foreach(['restaurant','spa','gym','swimming_pool','bar'] as $type)
+                        <option value="{{ $type }}" @selected(request('type') === $type)>
+                            {{ ucfirst(str_replace('_',' ',$type)) }}
+                        </option>
+                    @endforeach
                 </select>
 
-                <select name="status" class="form-select rounded-pill filter-input">
+                <!-- STATUS -->
+                <select name="status" class="form-select rounded-pill">
                     <option value="">All Status</option>
-                    <option value="available"   {{ request('status')=='available'?'selected':'' }}>Available</option>
-                    <option value="maintenance" {{ request('status')=='maintenance'?'selected':'' }}>Maintenance</option>
+                    <option value="available" @selected(request('status')==='available')>
+                        Available
+                    </option>
+                    <option value="maintenance" @selected(request('status')==='maintenance')>
+                        Maintenance
+                    </option>
                 </select>
 
-                <select name="archived" class="form-select rounded-pill filter-input">
+                <!-- ARCHIVED -->
+                <select name="archived" class="form-select rounded-pill">
                     <option value="">Archived?</option>
-                    <option value="0" {{ request('archived')=='0'?'selected':'' }}>Active</option>
-                    <option value="1" {{ request('archived')=='1'?'selected':'' }}>Archived</option>
+                    <option value="0" @selected(request('archived')==='0')>Active</option>
+                    <option value="1" @selected(request('archived')==='1')>Archived</option>
                 </select>
 
-                <button class="btn btn-outline-coffee rounded-pill px-4" type="submit">
+                <!-- FILTER BUTTON -->
+                <button class="btn btn-outline-coffee rounded-pill px-4">
                     <i class="bi bi-funnel me-1"></i> Filter
                 </button>
 
+                <!-- RESET -->
                 <a href="{{ route('admin.services.index') }}"
                    class="btn btn-light rounded-pill px-4">
                     Reset
                 </a>
+
             </div>
 
+            <!-- RIGHT SIDE BUTTON -->
             <button class="btn btn-coffee rounded-pill px-4"
                     type="button"
                     data-bs-toggle="modal"
                     data-bs-target="#modalAddService">
                 <i class="bi bi-plus-lg me-1"></i> Add Service
             </button>
+
         </form>
+
     </div>
 
     <!-- TABLE -->
     <div class="content-card">
         <div class="table-responsive">
+
             <table class="table table-hover align-middle">
                 <thead class="table-light">
                 <tr>
@@ -76,17 +93,21 @@
                 </thead>
 
                 <tbody>
+
                 @forelse ($services as $service)
                     <tr>
+
                         <td>{{ $service->name }}</td>
 
-                        <td>{{ ucfirst(str_replace('_', ' ', $service->service_type)) }}</td>
+                        <td>{{ ucfirst(str_replace('_',' ',$service->service_type)) }}</td>
 
                         <td>{{ $service->location ?? '—' }}</td>
 
                         <td>
                             ₱{{ $service->formatted_base_price }}
-                            <small class="text-muted">{{ $service->formatted_price_type }}</small>
+                            <small class="text-muted">
+                                {{ $service->formatted_price_type }}
+                            </small>
                         </td>
 
                         <td>{{ $service->capacity ?? '—' }}</td>
@@ -94,23 +115,20 @@
                         <td>{{ $service->start_time }} - {{ $service->end_time }}</td>
 
                         <td>
-                            @if ($service->status === 'available')
-                                <span class="badge bg-success">Available</span>
-                            @else
-                                <span class="badge bg-warning text-dark">Maintenance</span>
-                            @endif
+                            <span class="badge {{ $service->status === 'available' ? 'bg-success' : 'bg-warning text-dark' }}">
+                                {{ ucfirst($service->status) }}
+                            </span>
                         </td>
 
                         <td>
-                            @if ($service->is_archived)
-                                <span class="badge bg-secondary">Archived</span>
-                            @else
-                                <span class="badge bg-success">Active</span>
-                            @endif
+                            <span class="badge {{ $service->is_archived ? 'bg-secondary' : 'bg-success' }}">
+                                {{ $service->is_archived ? 'Archived' : 'Active' }}
+                            </span>
                         </td>
 
                         <td class="text-end">
 
+                            <!-- VIEW -->
                             <button class="btn btn-sm btn-primary"
                                     data-id="{{ $service->id }}"
                                     data-bs-toggle="modal"
@@ -118,19 +136,16 @@
                                 <i class="bi bi-eye"></i>
                             </button>
 
-                            @if (!$service->is_archived)
-                                <button class="btn btn-sm btn-warning"
-                                        data-id="{{ $service->id }}"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#modalEditService">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                            @else
-                                <button class="btn btn-sm btn-secondary" disabled>
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                            @endif
+                            <!-- EDIT -->
+                            <button class="btn btn-sm btn-warning"
+                                    data-id="{{ $service->id }}"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#modalEditService"
+                                    {{ $service->is_archived ? 'disabled' : '' }}>
+                                <i class="bi bi-pencil"></i>
+                            </button>
 
+                            <!-- ARCHIVE -->
                             <button class="btn btn-sm btn-danger"
                                     data-id="{{ $service->id }}"
                                     data-bs-toggle="modal"
@@ -139,17 +154,22 @@
                             </button>
 
                         </td>
-                    </tr>
 
+                    </tr>
                 @empty
                     <tr>
-                        <td colspan="9" class="text-center py-4 text-muted">
-                            <i class="bi bi-info-circle me-1"></i> No services found.
+                        <td colspan="9"
+                            class="text-center py-4 text-muted"
+                            style="font-size:1.1rem;">
+                            <i class="bi bi-info-circle me-1"></i>
+                            No services found.
                         </td>
                     </tr>
                 @endforelse
+
                 </tbody>
             </table>
+
         </div>
 
         <div class="d-flex justify-content-end mt-3">
@@ -163,129 +183,78 @@
     @include('admin.services.modals.archive')
     @include('admin.services.modals.view')
 
-@push('scripts')
-<script>
-document.addEventListener('DOMContentLoaded', () => {
+    {{-- AUTO-OPEN ADD MODAL IF VALIDATION FAILED --}}
+    @if ($errors->addService->any() && session('open_add_modal'))
+    <script>
+    document.addEventListener("DOMContentLoaded", () => {
+        new bootstrap.Modal(document.getElementById('modalAddService')).show();
+    });
+    </script>
+    @endif
 
-    /* SERVICE RULE MAPS */
-    const capacityRules = {
-        restaurant: [1,500],
-        bar: [1,500],
-        spa: [1,40],
-        gym: [1,500],
-        swimming_pool: [1,500],
-    };
-
-    const priceRules = {
-        restaurant: "per person",
-        bar: "per person",
-        spa: "per hour",
-        gym: "per day",
-        swimming_pool: "per day",
-    };
-
-    function updateServiceUI(prefix, type) {
-        const capHint = document.getElementById(`${prefix}-capacity-hint`);
-        if (capacityRules[type] && capHint) {
-            const [min,max] = capacityRules[type];
-            capHint.innerText = `Allowed: ${min}–${max}`;
-        }
-
-        const pField = document.getElementById(`${prefix}-price-type`);
-        if (pField) pField.value = priceRules[type] ?? "";
-    }
-
-    /* ADD SERVICE */
-    const addType = document.getElementById('add-service-type');
-    if (addType) {
-        addType.addEventListener('change', e => updateServiceUI('add', e.target.value));
-        updateServiceUI('add', addType.value);
-    }
-
-    /* VIEW SERVICE */
-    document.getElementById('modalViewService').addEventListener('show.bs.modal', event => {
-
-        const id = event.relatedTarget.getAttribute('data-id');
+    {{-- AUTO-OPEN EDIT MODAL IF VALIDATION FAILED --}}
+    @if ($errors->editService->any() && session('edit_id'))
+    <script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const id = "{{ session('edit_id') }}";
+        const modal = new bootstrap.Modal(document.getElementById('modalEditService'));
 
         fetch(`/admin/services/${id}`)
             .then(r => r.json())
             .then(svc => {
 
-                document.getElementById('viewServiceImage').src = svc.image_url;
-                document.getElementById('viewServiceName').innerText = svc.name;
-                document.getElementById('viewServiceType').innerText =
-                    svc.service_type.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
-                document.getElementById('viewServiceLocation').innerText = svc.location ?? '—';
-                document.getElementById('viewServicePrice').innerText = svc.base_price;
-                document.getElementById('viewServicePriceType').innerText = svc.price_type;
-                document.getElementById('viewServiceCapacity').innerText = svc.capacity ?? '—';
-                document.getElementById('viewServiceHours').innerText = `${svc.start_time} - ${svc.end_time}`;
-                document.getElementById('viewServiceDescription').innerText = svc.description ?? '';
+                const old = @json(old());
+
+                document.getElementById("formEditService").action = `/admin/services/${id}`;
+
+                document.getElementById("edit-name").value =
+                    old.name ?? svc.name;
+
+                document.getElementById("edit-location").value =
+                    old.location ?? svc.location ?? "";
+
+                document.getElementById("edit-service-type").value =
+                    old.service_type ?? svc.service_type;
+
+                document.getElementById("edit-capacity").value =
+                    old.capacity ?? svc.capacity ?? "";
+
+                document.getElementById("edit-base-price").value =
+                    old.base_price ?? svc.base_price;
+
+                document.getElementById("edit-start-time").value =
+                    old.start_time ?? svc.start_time;
+
+                document.getElementById("edit-end-time").value =
+                    old.end_time ?? svc.end_time;
+
+                document.getElementById("edit-description").value =
+                    old.description ?? svc.description ?? "";
+
+                document.getElementById("edit-status").value =
+                    old.status ?? svc.status;
+
+                const priceTypeField = document.getElementById("edit-price-type");
+
+                priceTypeField.value =
+                    old.price_type ??
+                    svc.formatted_price_type ??
+                    "";
+
+                window.ServicesCommon.updateHints("edit", svc.service_type);
+
+                modal.show();
             });
     });
+    </script>
+    @endif
 
-    /* EDIT SERVICE */
-    document.getElementById('modalEditService').addEventListener('show.bs.modal', event => {
-        const id = event.relatedTarget.getAttribute('data-id');
-        const form = document.getElementById('formEditService');
-        if (form) form.action = `/admin/services/${id}`;
-
-        fetch(`/admin/services/${id}`)
-            .then(r => r.json())
-            .then(svc => {
-
-                document.getElementById('edit-name').value = svc.name;
-                document.getElementById('edit-location').value = svc.location ?? '';
-                document.getElementById('edit-service-type').value = svc.service_type;
-                document.getElementById('edit-capacity').value = svc.capacity ?? '';
-                document.getElementById('edit-base-price').value = svc.base_price.replace(/,/g,'');
-                document.getElementById('edit-start-time').value = svc.start_time;
-                document.getElementById('edit-end-time').value = svc.end_time;
-                document.getElementById('edit-status').value = svc.status;
-                document.getElementById('edit-description').value = svc.description ?? '';
-
-                // svc.price_type is formatted (e.g. "per hour"), convert to raw machine value
-                const priceTypeMap = {
-                    'per person': 'per_person',
-                    'per hour': 'per_hour',
-                    'per day': 'per_day'
-                };
-
-                const normalizedPriceType = priceTypeMap[svc.price_type.toLowerCase()] || svc.price_type;
-                document.getElementById('edit-price-type').value = normalizedPriceType;
-
-                updateServiceUI('edit', svc.service_type);
-            });
-    });
-
-    /* When service-type changes in edit modal, update hints and price-type */
-    document.getElementById('edit-service-type')?.addEventListener('change', e => {
-        updateServiceUI('edit', e.target.value);
-        const map = {
-            restaurant: 'per_person',
-            bar: 'per_person',
-            spa: 'per_hour',
-            gym: 'per_day',
-            swimming_pool: 'per_day'
-        };
-        document.getElementById('edit-price-type').value = map[e.target.value] ?? '';
-    });
-
-    /* ARCHIVE SERVICE */
-    document.getElementById('modalArchiveService').addEventListener('show.bs.modal', event => {
-        const id = event.relatedTarget.getAttribute('data-id');
-        document.getElementById('formArchiveService').action = `/admin/services/${id}/archive`;
-
-        fetch(`/admin/services/${id}`)
-            .then(r => r.json())
-            .then(svc => {
-                // Changed to show opposite option (matching Rooms logic)
-                document.getElementById('archiveSelectService').value = svc.is_archived ? "0" : "1";
-            });
-    });
-});
-
-</script>
-@endpush
+    @push('scripts')
+        <script src="/admin/js/pages/services/common.js" defer></script>
+        <script src="/admin/js/pages/services/add.js" defer></script>
+        <script src="/admin/js/pages/services/edit.js" defer></script>
+        <script src="/admin/js/pages/services/view.js" defer></script>
+        <script src="/admin/js/pages/services/archive.js" defer></script>
+    @endpush
 
 </x-admin.layout>

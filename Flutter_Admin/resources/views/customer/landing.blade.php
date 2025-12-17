@@ -1,123 +1,218 @@
-@extends('customer.layouts.hotel')
+<x-customer.layout title="Hotel Crepúsculo">
 
-@section('content')
+{{-- HERO --}}
+<section class="hero-section">
+    <img src="{{ asset('images/hero.jpg') }}" class="hero-bg">
+    <div class="hero-overlay">
+        <h1 class="hero-title">
+            Modern Day Palace<br>
+            With Classic Elegance
+        </h1>
+    </div>
+</section>
 
-<!-- BOOKING RIBBON -->
-<div class="booking-ribbon shadow-lg p-4 rounded-4 mb-5"
-     style="background: #7C4A3A; color: #F3E6D6;
-            margin-top: -90px; 
-            position: relative; 
-            z-index: 20; 
-            width: 92%; 
-            margin-left: auto; 
-            margin-right: auto;
-            border-radius: 20px;">
+{{-- STAY PICKER --}}
+<section class="stay-picker">
+    <h4 class="stay-title">STAY WITH US</h4>
 
-    <!-- TABS -->
-    <ul class="nav nav-tabs border-0 mb-4">
-        <li class="nav-item">
-            <a class="nav-link active px-4 py-2 fw-bold"
-               style="background:#A55B44; color:#F3E6D6; border-radius:6px 6px 0 0;">
-                <i class="bi bi-door-open me-1"></i> Rooms
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link px-4 py-2 fw-bold" style="color:#F3E6D6;">
-                <i class="bi bi-sun"></i> Services
-            </a>
-        </li>
-    </ul>
+    <form method="GET"
+          id="stay-form"
+          action="#"
+          class="stay-form">
 
-    <!-- CONTENT -->
-    <div class="row align-items-center">
+        {{-- DATE RANGE --}}
+        <div class="stay-field">
+            <span class="stay-label">Arrival → Departure</span>
+            <input type="text"
+                   id="stay-dates"
+                   name="date_range"
+                   placeholder="Start Date – End Date"
+                   readonly>
+        </div>
 
-        <!-- DATE PICKER ONLY -->
-        <div class="col-md-8 mb-3">
-            <label class="fw-bold mb-1" style="color:#F3E6D6;">Date *</label>
-            <div class="p-3 rounded-3 d-flex align-items-center"
-                style="background:#A55B44; cursor:pointer;">
-                <i class="bi bi-calendar3 fs-5 me-3" style="color:#E9A46F;"></i>
-                
-                <input type="text"
-                    id="booking_date"
-                    class="form-control border-0 bg-transparent text-white"
-                    placeholder="Select Date"
-                    style="box-shadow:none; outline:none;">
+        {{-- GUESTS --}}
+        <div class="stay-field">
+            <span class="stay-label">No. of Guests</span>
+            <input type="number"
+                   id="stay-guests"
+                   name="guests"
+                   min="1"
+                   value="1">
+        </div>
+
+        {{-- ROOMS --}}
+        <div class="stay-field">
+            <span class="stay-label">Rooms</span>
+            <select id="stay-room"
+                    name="room"
+                    disabled>
+                <option value="">Select dates & guests</option>
+            </select>
+        </div>
+
+        {{-- SUBMIT --}}
+        <button type="submit"
+                id="stay-submit"
+                class="stay-btn"
+                disabled>
+            Book Room
+        </button>
+
+    </form>
+</section>
+
+{{-- ABOUT --}}
+<section id="about" class="about-section">
+
+    <div class="about-content">
+        <div>
+            <h6 class="about-subtitle">AT A GLANCE</h6>
+            <h2 class="about-title">Hotel Crepúsculo</h2>
+
+            <p>
+                Hotel Crepúsculo is a modern sanctuary shaped by warmth,
+                refinement, and the subtle beauty of twilight. Every space
+                is designed to slow time, inviting guests into an atmosphere
+                of calm and thoughtful luxury.
+            </p>
+
+            <p>
+                From curated interiors to attentive service, the hotel blends
+                contemporary comfort with timeless elegance. Natural tones,
+                handcrafted details, and generous spaces create an environment
+                that feels both intimate and expansive.
+            </p>
+
+            <p>
+                Whether visiting for leisure, celebration, or quiet retreat,
+                Hotel Crepúsculo offers an experience defined not by excess,
+                but by balance, intention, and enduring sophistication.
+            </p>
+        </div>
+
+        <div>
+            <img src="{{ asset('images/about.jpg') }}" class="img-fluid">
+        </div>
+    </div>
+
+</section>
+
+<div class="section-divider"></div>
+
+{{-- GALLERY --}}
+<section id="gallery" class="gallery-section">
+    <h2 class="gallery-title">Gallery</h2>
+
+    <div class="gallery-grid">
+        @for ($i = 1; $i <= 6; $i++)
+            <div class="gallery-card">
+                <img src="{{ asset("images/gallery_$i.jpg") }}">
             </div>
-        </div>
-
-        <!-- BOOK BUTTON -->
-        <div class="col-md-4 text-md-end mt-4 mt-md-0">
-            <a href="{{ route('hotel.book.room') }}"
-            class="btn px-5 py-3 fw-bold"
-            style="background:#E9A46F; color:#7C4A3A; border-radius:10px;">
-                BOOK NOW
-            </a>
-        </div>
-
+        @endfor
     </div>
+</section>
 
-</div>
-
-
-<!-- ABOUT SECTION -->
-<div class="container my-5">
-    <div class="row align-items-center mb-5">
-
-        <!-- IMAGE -->
-        <div class="col-md-5 mb-4 mb-md-0">
-            <img src="{{ asset('images/hotel_lobby.jpg') }}" 
-                alt="Hotel Crepúsculo"
-                class="img-fluid rounded-4 shadow">
-        </div>
-
-        <!-- ABOUT TEXT -->
-        <div class="col-md-7">
-            <h2 class="fw-bold text-uppercase mb-3" style="color: #A55B44;">About Us</h2>
-
-            <p class="lead" style="line-height: 1.8; color:#7C4A3A;">
-                At <strong>Hotel Crepúsculo</strong>, we bring warmth, comfort, and elegance together 
-                in a peaceful destination crafted to rejuvenate your senses.
-                Our interiors reflect the hues of twilight, embracing you in a soft and tranquil ambience.
-            </p>
-
-            <p style="line-height: 1.8; color:#7C4A3A;">
-                From thoughtfully curated suites to premium hospitality services, 
-                our philosophy is simple: create experiences that linger in memory.
-                Whether you're here for leisure, business, or celebration, 
-                our environment is designed to make every moment feel special.
-            </p>
-        </div>
-
+{{-- CONTACT --}}
+<section id="contact" class="contact-section">
+    <div class="contact-inner">
+        <h2>Contact Us</h2>
+        <p>Hotel Crepúsculo</p>
+        <p>Twilight Avenue, Sunset City</p>
+        <p>Email: info@hotelcrepusculo.com</p>
+        <p>Phone: +123 456 789</p>
     </div>
-</div>
-
-
-<!-- CONTACT SECTION -->
-<div class="container my-5 pt-4">
-    <h2 class="fw-bold text-uppercase mb-3" style="color: #A55B44;">Contact Us</h2>
-
-    <div class="p-4 rounded-4 shadow"
-         style="background: #D8C3B4; border-left: 6px solid #A55B44;">
-
-        <p class="mb-2" style="color:#7C4A3A;"><strong>Email:</strong> info@hotelcrepusculo.com</p>
-        <p class="mb-2" style="color:#7C4A3A;"><strong>Phone:</strong> +123 456 789</p>
-        <p class="mb-2" style="color:#7C4A3A;"><strong>Location:</strong> Twilight Avenue, Sunset City</p>
-
-    </div>
-</div>
-
-@endsection
+</section>
 
 @push('scripts')
 <script>
-$(function() {
-    $('#booking_date').datepicker({
-        format: 'mm/dd/yyyy',
-        autoclose: true,
-        todayHighlight: true
+    flatpickr("#stay-dates", {
+        mode: "range",
+        dateFormat: "Y-m-d",
+        minDate: "today",
+        onClose: fetchAvailableRooms
     });
-});
+
+    document.getElementById('stay-guests')
+        .addEventListener('change', fetchAvailableRooms);
+
+    async function fetchAvailableRooms() {
+        const dateRange = document.getElementById('stay-dates').value;
+        const guests    = document.getElementById('stay-guests').value;
+        const roomSel   = document.getElementById('stay-room');
+        const submitBtn = document.getElementById('stay-submit');
+
+        roomSel.innerHTML = `<option>Checking availability…</option>`;
+        roomSel.disabled = true;
+        submitBtn.disabled = true;
+
+        if (!dateRange || !guests) return;
+
+        try {
+            const res = await fetch("{{ route('hotel.rooms.availability') }}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
+                },
+                body: JSON.stringify({
+                    date_range: dateRange,
+                    guests: guests
+                })
+            });
+
+            const data = await res.json();
+            roomSel.innerHTML = "";
+
+            if (!data.length) {
+                roomSel.innerHTML = `<option>No rooms available</option>`;
+                return;
+            }
+
+            roomSel.innerHTML =
+                `<option value="">Select an available room</option>`;
+
+            data.forEach(room => {
+                const option = document.createElement('option');
+                option.value = room.id;
+                option.textContent =
+                    `${room.name} · ₱${room.base_price} / night`;
+                roomSel.appendChild(option);
+            });
+
+            roomSel.disabled = false;
+
+        } catch (e) {
+            roomSel.innerHTML = `<option>Error loading rooms</option>`;
+        }
+    }
+
+    document.getElementById('stay-room')
+        .addEventListener('change', function () {
+            document.getElementById('stay-submit').disabled = !this.value;
+        });
+
+    document.getElementById('stay-form')
+        .addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const roomId    = document.getElementById('stay-room').value;
+            const dateRange = document.getElementById('stay-dates').value;
+            const guests    = document.getElementById('stay-guests').value;
+
+            if (!roomId || !dateRange || !guests) return;
+
+            const [startDate, endDate] = dateRange.split(' to ');
+
+            const params = new URLSearchParams({
+                start_date: startDate,
+                end_date: endDate,
+                guests: guests
+            });
+
+            window.location.href =
+                `/hotel/book-room/${roomId}?${params.toString()}`;
+        });
 </script>
 @endpush
 
+</x-customer.layout>

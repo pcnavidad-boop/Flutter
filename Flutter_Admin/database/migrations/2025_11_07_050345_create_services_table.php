@@ -26,8 +26,8 @@ return new class extends Migration
             $table->string('slug')->unique();
 
             // Pricing
-            $table->enum('price_type', ['per_hour', 'per_day', 'per_person']);
-            $table->decimal('base_price', 10, 2)->default(0);
+            $table->enum('price_type', ['per_person'])->default('per_person');;
+            $table->decimal('base_price', 8, 2)->default(0);
 
             // Capacity
             $table->unsignedSmallInteger('capacity')->nullable();
@@ -46,8 +46,7 @@ return new class extends Migration
             $table->index('created_by');
             $table->index('service_type');
             $table->index('price_type');
-            $table->index('status');
-            $table->index('is_archived');
+            $table->index(['status', 'is_archived']);
 
             $table->timestamps();
         });

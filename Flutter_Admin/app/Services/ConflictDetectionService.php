@@ -4,23 +4,14 @@ namespace App\Services;
 
 use App\Models\RoomBooking;
 use App\Models\ServiceBooking;
+use Illuminate\Support\Facades\Log;
 
 class ConflictDetectionService
 {
-    /**
-     * Check whether the room has an overlapping booking
-     *
-     * @param \App\Models\Room $room
-     * @param string $start  Date string (Y-m-d)
-     * @param string $end    Date string (Y-m-d)
-     * @param int|null $ignoreId
-     * @return bool
-     */
     public function roomHasConflict($room, string $start, string $end, $ignoreId = null): bool
     {
         $q = RoomBooking::where('room_id', $room->id)
             ->where('booking_status', '!=', 'cancelled')
-            // overlap test: existing.start < new.end AND existing.end > new.start
             ->where('start_date', '<', $end)
             ->where('end_date', '>', $start);
 
@@ -32,15 +23,15 @@ class ConflictDetectionService
     }
 
     /**
-     * Check whether service is already at capacity for the given appointment.
+     * Service conflict detection (IMPROVED)
      *
-     * For time-based services (spa/restaurant/bar) we check overlapping times on the same date.
-     * For non-time services (gym/pool) we check daily capacity.
+     * For time-based services (spa/restaurant/bar) we SUM guests in overlapping intervals.
+     * For non-time services (gym/pool) we compare daily sum of guests vs capacity.
      *
-     * @param \App\Models\Service $service
-     * @param array $data Must contain 'appointment_date' and may contain 'start_time'/'end_time'
-     * @param int|null $ignoreId
-     * @return bool true if conflict (i.e. fully booked)
+     * @param $service
+     * @param array $data
+     * @param null|int $ignoreId
+     * @return bool
      */
     public function serviceHasConflict($service, array $data, $ignoreId = null): bool
     {
@@ -52,23 +43,38 @@ class ConflictDetectionService
             $base->where('id', '!=', $ignoreId);
         }
 
-        // Time-based capacity: check overlapping intervals count
+        // Time-based capacity: sum overlapping guests
         if (in_array($service->service_type, ['spa', 'restaurant', 'bar'])) {
-            // require start_time & end_time in $data for proper check
             if (!isset($data['start_time']) || !isset($data['end_time'])) {
-                // missing times — treat as conflict-safe (do not allow)
+                // require times to properly check — deny if missing
                 return true;
             }
 
-            $count = (clone $base)
-                ->where('start_time', '<', $data['end_time'])
-                ->where('end_time', '>', $data['start_time'])
-                ->count();
+            // fetch bookings for date
+            $items = $base->get();
 
-            return $count >= ($service->capacity ?? 0);
+            $requestedStart = $data['start_time'];
+            $requestedEnd   = $data['end_time'];
+            $requestedGuests = (int) ($data['number_of_guests'] ?? 1);
+
+            // compute concurrent guests by summing all overlapping bookings' number_of_guests
+            $concurrent = 0;
+            foreach ($items as $b) {
+                if ($b->start_time < $requestedEnd && $b->end_time > $requestedStart) {
+                    $concurrent += (int) $b->number_of_guests;
+                }
+            }
+
+            // Add the new booking's guests
+            $concurrent += $requestedGuests;
+
+            return ($service->capacity && $concurrent > $service->capacity);
         }
 
-        // Non-time services: simple daily count vs capacity
-        return ($base->count()) >= ($service->capacity ?? 0);
+        // Non-time services: daily capacity by summing guests
+        $dailyGuests = (clone $base)->sum('number_of_guests');
+        $requestedGuests = (int) ($data['number_of_guests'] ?? 1);
+
+        return ($service->capacity && ($dailyGuests + $requestedGuests) > $service->capacity);
     }
 }

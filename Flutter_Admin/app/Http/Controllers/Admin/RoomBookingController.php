@@ -12,6 +12,7 @@ use App\Services\BookingCalculator;
 use App\Services\BookingLifecycleService;
 use App\Services\ConflictDetectionService;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class RoomBookingController extends Controller
 {
@@ -24,6 +25,7 @@ class RoomBookingController extends Controller
         $this->conflict = $conflict;
     }
 
+    // List all room bookings
     public function index(Request $request)
     {
         $query = RoomBooking::with('room')
@@ -50,6 +52,7 @@ class RoomBookingController extends Controller
         ]);
     }
 
+    // Show room booking details
     public function show(RoomBooking $booking)
     {
         return response()->json([
@@ -57,21 +60,29 @@ class RoomBookingController extends Controller
             'guest_name'     => $booking->guest_name,
             'guest_email'    => $booking->guest_email,
             'guest_contact'  => $booking->guest_contact,
+            'number_of_guests' => $booking->number_of_guests,
+
             'room' => [
                 'id'   => $booking->room->id,
                 'name' => $booking->room->name,
+                'number' => $booking->room->room_number,
             ],
-            'number_of_guests' => $booking->number_of_guests,
+
             'start_date'       => $booking->start_date->toDateString(),
             'end_date'         => $booking->end_date->toDateString(),
+
             'booking_status'   => $booking->booking_status,
             'payment_status'   => $booking->payment_status,
+
             'total_price'      => $booking->total_price,
             'remarks'          => $booking->remarks,
+
             'created_at'       => $booking->created_at->format('M d, Y h:i A'),
+            'created_by'       => optional($booking->creator)->name ?? 'System',
         ]);
     }
 
+    // Create a new room booking
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -94,16 +105,17 @@ class RoomBookingController extends Controller
             return back()->withErrors(['room_id' => $e->getMessage()])->withInput();
         }
 
-        if ($data['number_of_guests'] > $room->capacity) {
+        if ($data['number_of_guests'] > ($room->capacity ?? PHP_INT_MAX)) {
             return back()->withErrors([
                 'number_of_guests' => "This room supports up to {$room->capacity} guests."
-            ]);
+            ])->withInput();
         }
 
         if ($this->conflict->roomHasConflict($room, $data['start_date'], $data['end_date'])) {
-            return back()->withErrors(['start_date' => 'This room is already booked for these dates.']);
+            return back()->withErrors(['start_date' => 'This room is already booked for these dates.'])->withInput();
         }
 
+        // Create booking (total_price will be computed)
         $booking = RoomBooking::create([
             'guest_name'       => $data['guest_name'],
             'guest_email'      => $data['guest_email'],
@@ -119,13 +131,31 @@ class RoomBookingController extends Controller
             'payment_status'   => 'unpaid',
         ]);
 
-        $booking->total_price = BookingCalculator::computeTotal($booking);
-        $booking->save();
+        // Compute total with safe-guard
+        try {
+            $booking->load('room');
+            $booking->total_price = BookingCalculator::computeTotal($booking);
+            $booking->save();
+        } catch (\Throwable $e) {
+            // If computation fails, log and delete the newly created booking to avoid bad state
+            Log::error('Failed to compute/save booking total after create', [
+                'error' => $e->getMessage(),
+                'booking_id' => $booking->id,
+            ]);
+
+            // Option A: delete booking and return error
+            $booking->delete();
+
+            return back()
+                ->withErrors(['error' => 'Unable to compute booking total. Please try again or contact admin.'])
+                ->withInput();
+        }
 
         return redirect()->route('admin.room_bookings.index')
             ->with('success', 'Booking created as pending. Please record payment to confirm.');
     }
 
+    // Update an existing room booking
     public function update(Request $request, RoomBooking $booking)
     {
         try {
@@ -151,14 +181,14 @@ class RoomBookingController extends Controller
 
         $room = $booking->room;
 
-        if ($data['number_of_guests'] > $room->capacity) {
+        if ($data['number_of_guests'] > ($room->capacity ?? PHP_INT_MAX)) {
             return back()->withErrors([
                 'number_of_guests' => "This room supports up to {$room->capacity} guests."
-            ]);
+            ])->withInput();
         }
 
         if ($this->conflict->roomHasConflict($room, $data['start_date'], $data['end_date'], $booking->id)) {
-            return back()->withErrors(['start_date' => 'This room is already booked for these dates.']);
+            return back()->withErrors(['start_date' => 'This room is already booked for these dates.'])->withInput();
         }
 
         $booking->update([
@@ -172,10 +202,39 @@ class RoomBookingController extends Controller
             'type'             => $data['type'] ?? $booking->type,
         ]);
 
-        $booking->total_price = BookingCalculator::computeTotal($booking);
-        $booking->save();
+        // Recompute total safely
+        try {
+            $booking->load('room');
+            $booking->total_price = BookingCalculator::computeTotal($booking);
+            $booking->save();
+        } catch (\Throwable $e) {
+            Log::error('Failed to recompute/save booking total after update', [
+                'error' => $e->getMessage(),
+                'booking_id' => $booking->id,
+            ]);
+
+            return back()->withErrors(['error' => 'Unable to compute booking total. Please try again or contact admin.']);
+        }
 
         return back()->with('success', 'Room booking updated.');
+    }
+
+    // Cancel a room booking (Admin only)
+    public function cancel(RoomBooking $booking)
+    {
+        try {
+            $this->lifecycle->assertStatusTransition($booking, 'cancelled');
+            $this->lifecycle->assertCancelable($booking);
+        } catch (\Exception $e) {
+            return back()->withErrors([
+                'error' => $e->getMessage()
+            ]);
+        }
+
+        $booking->booking_status = 'cancelled';
+        $booking->save();
+
+        return back()->with('success', 'Booking cancelled successfully.');
     }
 
     // Check room availability for a given month

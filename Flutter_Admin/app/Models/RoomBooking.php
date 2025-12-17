@@ -26,7 +26,6 @@ class RoomBooking extends Model
         'type',
         'booking_status',
         'payment_status',
-        'status_change_reason',
         'created_by',
         'room_id',
     ];
@@ -116,11 +115,46 @@ class RoomBooking extends Model
         return $this->guest_email;
     }
 
+    public function getBookingStatusBadgeAttribute()
+    {
+        return [
+            'pending'     => 'bg-warning text-dark',
+            'confirmed'   => 'bg-success',
+            'checked_in'  => 'bg-info text-dark',
+            'checked_out' => 'bg-dark',
+            'cancelled'   => 'bg-secondary',
+        ][$this->booking_status] ?? 'bg-light text-dark';
+    }
+
+    public function getBookingStatusLabelAttribute()
+    {
+        return ucfirst(str_replace('_', ' ', $this->booking_status));
+    }
+
+    public function getPaymentStatusBadgeAttribute()
+    {
+        return [
+            'unpaid'      => 'bg-secondary',
+            'downpayment' => 'bg-info text-dark',
+            'fully_paid'  => 'bg-success',
+            'refunded'    => 'bg-danger',
+        ][$this->payment_status] ?? 'bg-light text-dark';
+    }
+
+    public function getPaymentStatusLabelAttribute()
+    {
+        return ucfirst(str_replace('_', ' ', $this->payment_status));
+    }
+
     protected $appends = [
         'period',
         'schedule_display',
         'is_function_booking',
         'is_stay_booking',
         'remaining_balance',
+        'booking_status_badge',
+        'booking_status_label',
+        'payment_status_badge',
+        'payment_status_label',
     ];
 }

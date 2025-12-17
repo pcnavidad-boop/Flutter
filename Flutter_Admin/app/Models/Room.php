@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Str;
+use App\Models\User;
+use App\Models\RoomBooking;
 
 class Room extends Model
 {
@@ -51,9 +53,12 @@ class Room extends Model
         return Str::slug($name . '-' . Str::random(6));
     }
 
+    /**
+     * Admin routes use id; public routes may map by slug in separate controllers.
+     */
     public function getRouteKeyName()
     {
-        return request()->is('admin/*') ? 'id' : 'slug';
+        return 'id';
     }
 
     // Relationships

@@ -14,14 +14,14 @@ class Service extends Model
         'name',
         'location',
         'service_type',
-        'description',
-        'capacity',
-        'image',
         'price_type',
         'base_price',
+        'capacity',
         'start_time',
         'end_time',
         'status',
+        'description',
+        'image',
         'is_archived',
         'created_by',
         'slug',
@@ -56,7 +56,7 @@ class Service extends Model
 
     public function getRouteKeyName()
     {
-        return request()->is('admin/*') ? 'id' : 'slug';
+        return 'id';
     }
 
     /* RELATIONSHIPS */

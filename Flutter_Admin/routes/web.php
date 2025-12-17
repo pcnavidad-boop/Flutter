@@ -27,6 +27,12 @@ Route::prefix('hotel')->group(function () {
     Route::get('/rooms', [RoomController::class, 'index'])
         ->name('hotel.rooms');
 
+    Route::post('/rooms/availability', [RoomController::class, 'availability'])
+        ->name('hotel.rooms.availability');
+
+    Route::get('/rooms/{room}/booked-dates', [RoomController::class, 'bookedDates'])
+        ->name('hotel.rooms.booked-dates');
+
     Route::get('/rooms/{room}', [RoomController::class, 'show'])
         ->name('hotel.room.show');
 
@@ -48,6 +54,15 @@ Route::prefix('hotel')->group(function () {
      */
     Route::get('/services', [ServiceController::class, 'index'])
         ->name('hotel.services');
+
+    Route::post('/services/availability', [ServiceController::class, 'availability'])
+        ->name('hotel.services.availability');
+
+    Route::get('/services/{service}/booked-dates', [ServiceController::class, 'bookedDates'])
+        ->name('hotel.services.booked-dates');
+
+    Route::get('/services/{service}/booked-slots', [ServiceController::class, 'bookedSlots'])
+        ->name('hotel.services.booked-slots');
 
     Route::get('/services/{service}', [ServiceController::class, 'show'])
         ->name('hotel.service.show');

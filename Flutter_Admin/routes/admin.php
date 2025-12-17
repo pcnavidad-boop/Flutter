@@ -11,7 +11,7 @@ use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\ProfileController;
 
-Route::middleware(['auth'])
+Route::middleware(['auth', 'verified'])
     ->prefix('admin')
     ->group(function () {
 
@@ -84,10 +84,11 @@ Route::middleware(['auth'])
         Route::put('/room-bookings/{booking}', [RoomBookingController::class, 'update'])
             ->name('admin.room_bookings.update');
 
-        // Availability check (month view)
-        Route::get('/room-bookings/check-availability/{room}', 
-            [RoomBookingController::class, 'checkAvailability']
-        )->name('admin.room_bookings.checkAvailability');
+        Route::patch('/room-bookings/{booking}/cancel', [RoomBookingController::class, 'cancel']
+            )->name('admin.room_bookings.cancel');
+
+        Route::get('/room-bookings/check-availability/{room}', [RoomBookingController::class, 'checkAvailability']
+            )->name('admin.room_bookings.checkAvailability');
 
         /**
          * SERVICE BOOKINGS
@@ -104,6 +105,12 @@ Route::middleware(['auth'])
         Route::put('/service-bookings/{booking}', [ServiceBookingController::class, 'update'])
             ->name('admin.service_bookings.update');
 
+        Route::patch('/service-bookings/{booking}/cancel', [ServiceBookingController::class, 'cancel']
+            )->name('admin.service_bookings.cancel');
+
+        Route::get('/service-bookings/check-availability/{service}', [ServiceBookingController::class, 'checkAvailability']
+            )->name('admin.service_bookings.checkAvailability');
+
         /**
          * PAYMENTS 
          */
@@ -118,6 +125,10 @@ Route::middleware(['auth'])
 
         Route::delete('/payments/{payment}', [PaymentController::class, 'destroy'])
             ->name('admin.payments.destroy');
+
+        Route::get('/payments/bookings/{type}', [PaymentController::class, 'listBookings']);
+
+        Route::get('/payments/summary/{type}/{reference}', [PaymentController::class, 'bookingSummary']);
 
         /**
          * NOTIFICATIONS
